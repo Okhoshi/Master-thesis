@@ -168,7 +168,7 @@ Our main purpose is to establish this protocol as an extension of DTLS. In this 
 \subsection{Extension discovery}
 
 The first step, and the first requirement, was to remain compatible with the standard DTLS client and server. To do that, the MPDTLS extension discovery is made through a new entry in the extensions list of the \verb!ClientHello! and \verb!ServerHello! messages. If a non-MPDTLS capable server receives a \verb!ClientHello!, it will ignore the option  as it is specified in the TLS 1.2 specifications (\verb!RFC5246!). This option is carried as any other TLS extension.
-
+\todo[inline]{Expliquer en détail notre extension, diff \% TLS extensions qui ne concernent que les sig\_algo normalement (cf Section A.4.1 de RFC5246}
 %The format of this extension is depicted in the figure \ref{fig:extension}.
 
 %\todo[inline]{new \{Client,Server\}Hello}
@@ -316,7 +316,7 @@ In this feedback, we do not want to acknowledge every packet received. Instead w
 As a receiver, by transmitting these information back to the sender, we give him the ability to estimate the loss rate for this particular subflow. The minimum and maximum sequence numbers received alone are not enough to find very accurately the loss rate but this is a way to keep the packet size constant. Moreover, if we consider the reordering on a single path as a rare event, we can obtain the loss rate by 
 
 \begin{equation*}
-LR = packets_{sent} / packets_{received}.
+LR = \frac{packets_{sent}}{packets_{received}}
 \end{equation*}
 
 Where $packets_{sent}$ is maintained by the sender and $packets_{received}$ is extracted from the feedback. Note that the sender must only keep track of packets with sequence number greater than the last max sequence number received from the last feedback. By doing so, the space used to store these sequence numbers will be kept reasonably small. In the case we don't receive anymore feedback, we will progressively send less and less packets to this address until we send no more. Therefore, there is no way we exceed sender's memory simply because the receiver is dead.
@@ -380,6 +380,8 @@ struct {
   uint32    feedback_sequence_number;
 } feedbackAckMessage;
 \end{lstlisting}
+
+Feedback reporting is done on a regular basis. The threshold to send a feedback is to be defined accordingly to the bandwidth of the link. On a gigabit speed link for example, we will not send feedback every 10 packets but we could on a slower link.
 
 
 
