@@ -7,6 +7,7 @@
 \usepackage{todonotes}
 \usepackage{times}
 \usepackage{amsmath}
+\usepackage{natbib}
 
 
 
@@ -39,8 +40,8 @@
 
 \usepackage[
 breaklinks=true,colorlinks=true,
-%linkcolor=blue,urlcolor=blue,citecolor=blue,% PDF VIEW
-linkcolor=black,urlcolor=black,citecolor=black,% PRINT
+linkcolor=blue,urlcolor=blue,citecolor=blue,% PDF VIEW
+%linkcolor=black,urlcolor=black,citecolor=black,% PRINT
 bookmarks=true,bookmarksopenlevel=2]{hyperref}
 
 \usepackage{geometry}
@@ -156,7 +157,7 @@ June 2015
 In this chapter, we will explore the different additions and modifications made to DTLS to support the Multi Path capability. These changes are categorized in three groups:
 \begin{itemize}
 \item Advertising the extension and the interfaces
-\item Establishing secure subflows without introducing attacks vectors
+\item Establishing secure sub-flows without introducing attacks vectors
 \item Gathering and exchanging statistics data about the health of each flows, regardless of the others. 
 \end{itemize}
 
@@ -167,7 +168,7 @@ Our main purpose is to establish this protocol as an extension of DTLS. In this 
 
 \subsection{Extension discovery}
 
-The first step, and the first requirement, was to remain compatible with the standard DTLS client and server. To do that, the MPDTLS extension discovery is made through a new entry in the extensions list of the \verb!ClientHello! and \verb!ServerHello! messages. If a non-MPDTLS capable server receives a \verb!ClientHello!, it will ignore the option  as it is specified in the TLS 1.2 specifications (\verb!RFC5246!). This option is carried as any other TLS extension.
+The first step, and the first requirement, was to remain compatible with the standard DTLS client and server. To do that, the MPDTLS extension discovery is made through a new entry in the extensions list of the \verb!ClientHello! and \verb!ServerHello! messages. If a non-MPDTLS capable server receives a \verb!ClientHello!, it will ignore the option  as it is specified in the TLS 1.2 specifications (\verb!RFC5246!\cite{rfc5246}). This option is carried as any other TLS extension.
 \todo[inline]{Expliquer en détail notre extension, diff \% TLS extensions qui ne concernent que les sig\_algo normalement (cf Section A.4.1 de RFC5246}
 %The format of this extension is depicted in the figure \ref{fig:extension}.
 
@@ -177,7 +178,7 @@ After the exchange of the \verb!HelloVerifyRequest! and \verb!ClientHello! with 
 
 \subsection{Interfaces advertising}
 
-Once the handshake is finished and the initial flow is established, the two hosts can advertise new interfaces available for other sub-flows. This advertising is done within the \verb!ChangeInterfaceMessage! (CIM), a packet carrying multiple addresses. The address of each available interface is included under the form presented in figure \ref{fig:cimFormat}. We use 16 bytes for the address to be IPv6 compliant. IPv4 addresses can be translated to/from IPv6 format following \verb!RFC6052! .  
+Once the handshake is finished and the initial flow is established, the two hosts can advertise new interfaces available for other sub-flows. This advertising is done within the \verb!ChangeInterfaceMessage! (CIM), a packet carrying multiple addresses. The address of each available interface is included under the form presented in Figure \ref{fig:cimFormat}. We use 16 bytes for the address to be IPv6 compliant. IPv4 addresses can be translated to/from IPv6 format following \verb!RFC6052!\cite{rfc6052}.  
 
 \begin{figure}[!h]
 \centering
@@ -189,7 +190,7 @@ Once the handshake is finished and the initial flow is established, the two host
 \label{fig:cimFormat}
 \end{figure}
 
-The \verb!CIM! contains all the addresses the host want to share. We decided to always transmit all the addresses to provide redundancy. Also, to be sure that we does not loose potential bandwidth, the \verb!CIM!s are retransmitted in case of loss and so are acknowledged. To avoid wasting resources, we use the acknowledgement to transmit the list of addresses of the receiving host. This way, we are sure that each host knows the exact configuration of the other at any time (once the first host received the acknowledgement). An example of the \verb!CIM! exchange is shown in the Figure \ref{fig:CIMexchange}.
+The \verb!CIM! contains all the addresses a host want to share. We decided to always transmit all the addresses to provide redundancy. Also, to be sure that we does not loose potential bandwidth, the \verb!CIM!s are retransmitted in case of loss and so are acknowledged. To avoid wasting resources, we use the acknowledgement to transmit the list of addresses of the receiving host. This way, we are sure that each host knows the exact configuration of the other at any time (once the first host received the acknowledgement). An example of the \verb!CIM! exchange is shown in the Figure \ref{fig:CIMexchange}.
 
 \begin{figure}[!h]
 \centering
@@ -204,8 +205,9 @@ The \verb!CIM! contains all the addresses the host want to share. We decided to 
 \declinst{server}{Server}{}
 
 \lost[r]{ChangeInterfaceMessage[2, client1, client2, reply=1]}[t]{}{client}[7]
+\settimeout{}{client}[1]
 \nextlevel
-\mess{ChangeInterfaceMessage[2, client1, client2, client3, reply=1]}[t]{client}[0]{server}[1]
+\mess{ChangeInterfaceMessage[2, client1, client2, reply=1]}[t]{client}[0]{server}[1]
 \nextlevel
 \mess{ChangeInterfaceMessage[1, server1, [reply=0]]}[b]{server}[1]{client}[1]
 \nextlevel
@@ -249,7 +251,7 @@ The transmission delay is an important measure when we want to balance a load ov
 
 The most intuitive way to compute the time taken to realize a task is to compare the time before its beginning and after its completion, which makes no sense when it comes over the network. As the task begins on one host and finishes on the other, we are subject to the clock synchronisation.
 
-However, \cite{song2009estimator} propose a practical solution that suits our needs. The idea is simple: we don't need to know the exact One-way delay of a subflow, we just need to be able to compare the delays between the different sub-flows. Thus, we can compute the transmission delay of a flow as the difference between the send time and the receive time, with a $\Delta T$ being the clock desynchronization between the two hosts. As the two end-points of each sub-flows are the same, this $\Delta T$ is assumed to be constant over all the sub-flows.
+However, \cite{song2009estimator} propose a practical solution that suits our needs. The idea is simple: we don't need to know the exact One-way delay of a subflow, we just need to be able to compare the delays between the different sub-flows. Thus, we can compute the transmission delay of a flow as the difference between the send time and the receive time, with a $\Delta T$ term being the clock desynchronization between the two hosts. As the two end-points of each sub-flows are the same, this $\Delta T$ is assumed to be constant over all the sub-flows.
 
 Once we know how to estimates the forward delay of each subflow, or at least how to rank them on this criteria, we can easily create a mechanism to compute this estimation, it is illustrated in the Figure \ref{fig:forwardDelayComputation}. To avoid overhead on each DTLS AppData packets, we took the decision to use new dedicated packets to compute the forward delay. Each host will periodically send probe packet containing the current timestamp. When the other host receives it, it can compute the transmission delay modulo $\Delta T$. For the sake of simplicity, only the average of the delay computed will be transmitted in the \verb!feedback! report, as presented in Section \ref{sec:feedbackReport}. The $\Delta T$ is considered constant over time because the clocks are increasing in the same way on all the hosts. As $\Delta T$ is constant, it does not introduce bias in the calculation of the transmission delay average.
 
@@ -292,11 +294,13 @@ Once received by the other host (Client$_{\{1,2\}}$), the latter can compute the
 $$FD_1 = T_1 - T_2' + \Delta{}T$$
 $$FD_2 = T_3 - T_4' + \Delta{}T$$
 and update its "average" of the Forward Delay of the sub-flow.
-$$FD_{avg} = \frac{FD_{prev\_avg} * n + FD_2}{n + 1}$$
+$$FD_{avg\_i} = \frac{FD_{avg\_i-1} * n + FD_i}{n + 1} + \Delta T$$
 \end{minipage}
 \end{figure}
 
 A careful reader would notice that $FD_{avg}$ is not strictly an average in the mathematical way. Instead of giving the full weight of its past to the old value of $FD_{avg}$, we choose to give it some constant weight. In this way, the new value can influence enough in case of sudden change, but cannot completely mess up the average in case of isolated measurement error. This weight $n$ is initialized to 0 at the beginning of the sub-flow and is incremented with each received \verb!Probe! up to a given ceiling. Once this threshold is reached, it is locked and no more incremented. The historic value gains momentum up to a certain point, avoiding to overcome changes in the forward delay and to be too sensible to quick variations.
+
+Finally, this is this $FD_{avg\_i}$ value that is transmitted to the emitter through the feedback message, as we can see in the Listing \ref{lst:feedbackM}. The sender thus knows the forward delay estimation of each sub-flows and its scheduler can make better balancing decisions.
 
 \subsection{Global reorder rate}
 
@@ -316,7 +320,7 @@ In this feedback, we do not want to acknowledge every packet received. Instead w
 As a receiver, by transmitting these information back to the sender, we give him the ability to estimate the loss rate for this particular subflow. The minimum and maximum sequence numbers received alone are not enough to find very accurately the loss rate but this is a way to keep the packet size constant. Moreover, if we consider the reordering on a single path as a rare event, we can obtain the loss rate by 
 
 \begin{equation*}
-LR = \frac{packets_{sent}}{packets_{received}}
+LR = \frac{packets_{sent} - packets_{received}}{packets_{sent}}
 \end{equation*}
 
 Where $packets_{sent}$ is maintained by the sender and $packets_{received}$ is extracted from the feedback. Note that the sender must only keep track of packets with sequence number greater than the last max sequence number received from the last feedback. By doing so, the space used to store these sequence numbers will be kept reasonably small. In the case we don't receive anymore feedback, we will progressively send less and less packets to this address until we send no more. Therefore, there is no way we exceed sender's memory simply because the receiver is dead.
@@ -359,7 +363,7 @@ Figure \ref{fig:feedback} presents an example of how feedback takes place once t
 
 The structure of \verb!feedbackMessage! is presented in Listing \ref{lst:feedbackM}. In the example \verb!Feedback(2,1,3)! means that we have received 2 packets since the last acknowledged feedback. The minimum and maximum sequence number received are 1 and 3 respectively. The client replies with a \verb!feedbackAckMessage! carrying the sequence number of the corresponding \verb!feedbackMessage!.
 
-The size of the sequence number is directly taken from the \verb!RFC6347! while we consider 8 bytes to be enough to count the packets. The threshold which triggers the transmission of a feedback must be fixed way before this limit to provide useful information even at Gigabit speed. But in case some feedback or feedbackAck are lost, we must handle more than usual values. Indeed, as long as no acknowledgement has been received, the receiver will continue to send overlapping feedback (i.e. the new feedback contains information about packets already reported in old feedback but not acknowledged).
+The size of the sequence number is directly taken from the \verb!RFC6347!\cite{rfc6347} while we consider 8 bytes to be enough to count the packets. The threshold which triggers the transmission of a feedback must be fixed way before this limit to provide useful information even at Gigabit speed. But in case some feedback or feedbackAck are lost, we must handle more than usual values. Indeed, as long as no acknowledgement has been received, the receiver will continue to send incremental feedback (i.e. the new feedback contains information about packets already reported in old feedback but not acknowledged).
 
 
 \addtypes{struct, uint48, uint64, feedbackMessage, feedbackAckMessage}
@@ -369,7 +373,7 @@ struct {
   uint64    received_packets_count;
   uint48    max_sequence_number;
   uint48    min_sequence_number;
-  uint64      average_forward_delay;
+  uint64    average_forward_delay;
 } feedbackMessage;
 \end{lstlisting}
 
@@ -389,7 +393,7 @@ Feedback reporting is done on a regular basis. The threshold to send a feedback 
 
 
 \bibliographystyle{unsrt}
-\bibliography{sample}
+\bibliography{articles,rfcs}
 
 \end{document}
 
