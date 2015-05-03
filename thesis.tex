@@ -9,10 +9,21 @@
 \usepackage{amsmath}
 \usepackage{natbib}
 \usepackage{array}
-
-
-
 \usepackage{listings}
+\usepackage{pgf-umlsd}
+\usepackage{parskip}
+
+\setlength{\parskip}{10pt} %add space between paragraphs
+
+%%% Fix the issue with \mess redefinition when importing msc
+\let\msg\mess
+\let\mess\undefined
+
+\newcommand\draft{1}
+
+\if1\draft
+    \overfullrule=2cm
+\fi
 
 \lstset{
   language = C,
@@ -35,6 +46,8 @@
   showstringspaces=false     
  }
 
+\renewcommand\lstlistlistingname{List of Listings}
+\newlistof{lstlistoflistings}{lol}{\lstlistlistingname}
 \newcommand\typestyle{\rmfamily\mdseries\upshape}
 \newcommand\addtypes[1]{%
   \lstset{morekeywords=[3]{#1}}}
@@ -44,6 +57,8 @@ breaklinks=true,colorlinks=true,
 %linkcolor=blue,urlcolor=blue,citecolor=blue,% PDF VIEW
 linkcolor=black,urlcolor=black,citecolor=black,% PRINT
 bookmarks=true,bookmarksopenlevel=2]{hyperref}
+
+\usepackage{breakurl}
 
 \usepackage{geometry}
 % PDF VIEW
@@ -76,13 +91,19 @@ bindingoffset=10mm, top=25mm,bottom=25mm}
 %\pagestyle{companion}\nouppercaseheads 
 %\pagestyle{headings}
 %\pagestyle{Ruled}
-\pagestyle{plain}
+\pagestyle{plain}\nouppercaseheads
 \makepagestyle{plain}
+\if0\draft
+\makeevenfoot{plain}{\thepage}{Multipath DTLS: Design and Implementation}{}
+\makeoddfoot{plain}{}{Q. Devos \& L. Fortemps de Loneux}{\thepage}
+\makeevenhead{plain}{\leftmark}{}{}
+\makeoddhead{plain}{}{}{\rightmark}
+\else
 \makeevenfoot{plain}{\thepage}{}{}
 \makeoddfoot{plain}{}{}{\thepage}
 \makeevenhead{plain}{}{}{}
 \makeoddhead{plain}{}{}{}
-
+\fi
 
 \maxsecnumdepth{subsection} % chapters, sections, and subsections are numbered
 \maxtocdepth{subsection} % chapters, sections, and subsections are in the Table of Contents
@@ -91,13 +112,13 @@ bindingoffset=10mm, top=25mm,bottom=25mm}
 %%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%
 
 \begin{document}
-
 %%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%
 %   TITLEPAGE
 %
 %   due to variety of titlepage schemes it is probably better to make titlepage manually
 %
 %%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%
+\if0\draft
 \thispagestyle{empty}
 
 {%%%
@@ -109,7 +130,7 @@ bindingoffset=10mm, top=25mm,bottom=25mm}
 
 EPL-2014 384\\
 {\huge 
-To be defined
+Multipath DTLS: Design and Implementation
 }
 
 \vspace{2.5cm}
@@ -130,8 +151,8 @@ Université Catholique de Louvain
 \vspace{3.5cm}
 
 Supervisors: \\
-            Prof. Olivier Bonaventure\\
-             Prof. Olivier Pereira
+Prof. Olivier Bonaventure\\
+Prof. Olivier Pereira
 
 \vspace{\fill}
 
@@ -150,14 +171,25 @@ June 2015
 \listoffigures*
 \clearpage
 
+\lstlistoflistings*
+\clearpage
+
 %%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%
 %%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%
 
+%\include{intro}
+%\include{rpc}
 %\include{design}
-\include{dtls}
+\fi
+%\include{dtls}
+\include{implem}
+%\include{performances}
+\if0\draft
+
+\include{conclusion}
 \appendix
 
-
+\fi
 \bibliographystyle{unsrt}
 \bibliography{articles,rfcs}
 

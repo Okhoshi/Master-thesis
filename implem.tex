@@ -1,0 +1,146 @@
+\chapter{Implementation}\label{chap:implementation}
+
+Since we designed MPDTLS as an extension for DTLS, it was logical to not implement it from scratch but start from an existing implementation of DTLS. Multiple libraries implement the latest version \footnote{\url{https://en.wikipedia.org/wiki/Datagram_Transport_Layer_Security\#Implementations}}, but we choose wolfSSL \cite{wolfssl} (previously CyaSSL) as our starting point.
+
+The choice was done following multiple criteria :
+
+\begin{itemize}
+\item Clarity of code
+\item Documentation
+\item Existing examples
+\item Library size
+\end{itemize}
+
+Unlike OpenSSL, wolfSSL contains a reduced number of files to handle SSL/TLS and DTLS. The objective of this library is to be as light as possible to allow integration in embedded systems. As stated in their official website \footnote{\url{http://www.yassl.com/yaSSL/Home.html}}, the library is up to 20 times smaller than OpenSSL.
+
+A documentation and working examples are provided to help people using it. For all these reasons, we chose to go with wolfSSL. In the following sections, we are going to explain how this library works, how we integrate our additions to DTLS and the various problems we had to face during the implementation.
+
+\section{Packet reception}
+The first step is to make the library recognizes the new packets and handles them correctly, like issuing a \texttt{FeedbackAck} upon reception of a \texttt{Feedback}. This part is quite easy once the internal flow followed by the received packets is understood. The flow we are going to explain is pictured in the Figure \ref{fig:readdiag}. The call related to mutex are not part of the original wolfSSL code and are explained in the Section \ref{sec:threadsafe}.
+
+First of all, it is important to recall wolfSSL is a library and thus does not have any existence outside the call made in the client code.
+
+To receive packets, an application must call the \texttt{wolfSSL\_read(WOLFSSL*,void*,int)} function once all the library is correctly set up. When this function is call, the process enters the library, dives into the \texttt{ReceiveData} and \texttt{ProcessReply} functions and will eventually make a blocking call into the \texttt{CBIORecv} macro\footnote{The low-level mechanisms to read and write on sockets are indeed encapsulated into macros selected following the compilation or configuration flags. This provides to the library some cross-platform aspects.} to listen on the socket. When a new packet arrives, the process is woke up and it copies the packet into an internal buffer. Once the copy is made and the pointers correctly set, the process can treat the packet.
+
+\begin{figure}[!h]
+\centering
+\begin{sequencediagram}
+\centering
+\newthread[blue]{r}{wolfSSL\_read}
+\newinst{rd}{ReceiveData}
+\newinst{pr}{ProcessReply}
+\newinst{gid}{GetInputData}
+\newinst{rc}{Receive}
+\newinst{grh}{GetRecordHeader}
+%\newinst{do}{Do\textit{Type}}
+
+\begin{call}{r}{MutexLock}{r}{}
+\end{call}
+\begin{call}{r}{}{rd}{}
+    \begin{sdblock}{while}{no content in \texttt{clearOutputBuffer}}
+        \begin{call}{rd}{}{pr}{}
+            \begin{call}{pr}{}{gid}{}
+                \begin{call}{gid}{}{rc}{}
+                    \begin{call}{rc}{MutexUnlock}{rc}{}
+                    \end{call}
+                    \begin{call}{rc}{\texttt{CBIORecv}}{rc}{}
+                        \postlevel
+                    \end{call}
+                    \begin{call}{rc}{MutexLock}{rc}{}
+                    \end{call}
+                \end{call}
+            \end{call}
+            \begin{call}{pr}{}{grh}{\shortstack{\textit{ContentType}\\Length}}
+                \postlevel
+            \end{call}
+            \begin{sdblock}{switch}{on \textit{ContentType}}
+                \begin{call}{pr}{Do\textit{ContentType}}{pr}{}
+                    \postlevel
+                \end{call}
+            \end{sdblock}
+        \end{call}
+    \end{sdblock}
+\end{call}
+\begin{call}{r}{MutexUnlock}{r}{}
+\end{call}
+\end{sequencediagram}
+\caption{Major functions called on \texttt{wolfSSL\_read()}\label{fig:readdiag}}
+\end{figure}
+
+
+First, it reads the RecordLayer header, containing the length of the packet and the type of the Record. The latter can be one of the \texttt{ContentType} value defined in the RFC. During this verification, it also define, based on the \texttt{ContentType} value, if the packet is encrypted and therefore needs to be deciphered before handling it.
+
+Then, after the decryption of the packet if it was needed, the packet is dispatched to the handling function corresponding to the Record type. These functions are called following the pattern "\texttt{Do}\textit{TypeName}" (e.g. \textit{DoApplicationData} to handle AppData packets). For the sake of clarity, these two steps (decryption and all possible \texttt{Do}functions) are not represented on the Figure \ref{fig:readdiag}.
+
+
+In the case of the original implementation of wolfSSL, the only Record type that could be encountered at this point was AppData. The function \textit{DoApplicationData} does some treatments on the packet like verifying the MAC or decompressing the packet if needed and finally copies the clear content of the packet into a specific buffer called \texttt{clearOutputBuffer}. Then, if the input buffer has been completely consumed, the process comes back to the function \texttt{ReceiveData}. This function copies the content of \texttt{clearOutputBuffer} to the application buffer passed in argument of \texttt{wolfSSL\_read}, giving to the client application the content of the received packet. The library will then exit and give the control back to the calling code.
+
+\subsection{Adding new types}
+
+Adding the recognition of a new type is done in two steps, after the defininion of all the needed declarations in the header file: we start by adding the type in the switch of the \texttt{GetRecordHeader} function. We can also add indication about the packet type, such as if the content is ciphered or not. Then, we need to add a new case for the type in the switch statement of the \texttt{ProcessReply} function, in which we prepare and make the call to a new, dedicated function \texttt{Do\textit{TypeName}}.
+
+Now that library recognizes the new type and call the appropriate \texttt{Do}function, we can implement the latter with the intended behavior. In our case, we use the \texttt{DoApplicationData} as a base for the implementation of all the \textit{Do}function of protocol-level packet types (e.g. \texttt{Feedback}, \texttt{WantConnect}\dots). It is the easiest solution to get ciphering and authentication of the packets.But it is important to not let these packets leave the library and be delivered to the application. To achieve this, we move the pointer marking the end of the \texttt{clearOutputBuffer} before the beginning of the current packet, once we have finished the treatment of the packet.
+
+\section{Packet emission}
+
+The packets emission is even simpler, as we don't have to wait for some event, we trigger it. So, in wolfSSL, an application can send packets by the use of the \texttt{wolfSSL\_write(WOLFSSL*, void*, int)} function. As shown in the Figure \ref{fig:writediag}, the process then enters in \texttt{SendData}, which is responsible of all the authentication and encryption stuff, in the original code of the library. We moved the code handling the MAC and encryption in a new function \texttt{SendPacket}, allowing us to use the encryption not only for the Application Data packets but also for our protocol-level packets. As for the receiving functions, we created a set of \texttt{Send\textit{TypeName}} functions, in charge of building the corresponding packets before sending them. All these methods end by calling \texttt{SendPacket} which will then call \texttt{SendBuffered}. \texttt{SendBuffered} is the last function in the library before leaving the control to the concrete sending macro \texttt{CBIOSend}, and this is the place we choose to put our scheduling mechanism. The socket to use is thus chosen at the beginning of \texttt{SendBuffered}, just before the call to the sending function.
+
+\begin{figure}[!h]
+\centering
+\begin{sequencediagram}
+\centering
+\newthread[blue]{w}{wolfSSL\_write}
+\newinst{sd}{SendData}
+\newinst{sp}{SendPacket}
+\newinst{bm}{BuildMessage}
+\newinst{sb}{SendBuffered}
+%\newinst{do}{Do\textit{Type}}
+
+\begin{call}{w}{MutexLock}{w}{}
+\end{call}
+\begin{call}{w}{}{sd}{}
+        \begin{call}{sd}{}{sp}{}
+            \begin{call}{sp}{}{bm}{}
+                \begin{call}{bm}{AddRecordHeader}{bm}{}
+                    \postlevel
+                \end{call}
+                \begin{call}{bm}{Encrypt}{bm}{}
+                    \postlevel
+                \end{call}
+                \begin{call}{bm}{HashOutput}{bm}{}
+                    \postlevel
+                \end{call}
+            \end{call}
+            \begin{call}{sp}{}{sb}{}
+                \begin{call}{sb}{\texttt{CBIOSend}}{sb}{}
+                    \postlevel
+                \end{call}
+            \end{call}
+        \end{call}
+\end{call}
+\begin{call}{w}{MutexUnlock}{w}{}
+\end{call}
+\end{sequencediagram}
+\caption{Major functions called on \texttt{wolfSSL\_write()}\label{fig:writediag}}
+\end{figure}
+
+\section{Thread-safety}\label{sec:threadsafe}
+
+A major drawback of living at the application-level as a library is that you are really dependent of the application that uses you. For instance, all protocol-level packets need responses to ensure the reception, since DTLS is not reliable. But, to trigger the internal mechanisms explained in the previous sections, the library must be in a listening state, constantly. If an application needs to send some packets, which seems to be a normal use case of the library, it will need to use threads to read and write simultaneously. For this reason, we need to be sure that using the library in such way will not cause trouble. As the library uses a lot of internal buffers when it reads or writes, and that our treatments of protocol-level packets involves packets emission during packets reading, we considered the whole library code as a critical section, with a notable exception for the blocking call in the \texttt{Receive} function\footnote{As a call to \texttt{select} is blocking, it prevents the application to write packets when the other thread waits for incoming packets, which would add an extra undesirable overhead.}.
+
+Thus, as with every critical section that you want to protect, we added a mutex to lock when entering either \texttt{wolfSSL\_read} or \texttt{wolfSSL\_write} and unlocked just before leaving these functions. This mutex is also unlock just before the blocking call to select and relock right after the select returns.
+
+\subsection{What about processes ?}
+
+Using processes instead of the threads is another solution, but either processes have to use different session credentials or have to share memory to use the same session object. One could propose to simply duplicate the session either through the session resuming or via copy-on-write session mechanisms, but just having the same session credentials is not sufficient to the library to correctly work. As we use statistics to choose the best path to send new packets, the session object must be completely in sync between the processes, with all the risks of memory corruption due to the simultaneous accesses. We finally end up in the same situation as with the threads.
+
+For the sake of simplicity, we recommend thus to simply use threads, as we made our best to get a thread-safe library.
+
+\section{Managing retransmissions}
+
+\subsection{Timeouts}
+
+\subsection{Packets count}
+
+\section{Multipath integration}
+\subsection{}

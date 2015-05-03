@@ -1,4 +1,4 @@
-\chapter{Protocol Design}
+\chapter{Protocol Design}\label{chap:design}
 
 In this chapter, we will explore the different additions and modifications made to DTLS to support the Multi Path capability. These changes are categorized in three groups:
 \begin{itemize}
@@ -14,7 +14,7 @@ Our main purpose is to establish this protocol as an extension of DTLS. In this 
 
 \subsection{Extension discovery}
 
-The first step, and the first requirement, was to remain compatible with the standard DTLS client and server. To do that, the MPDTLS extension discovery is made through a new entry in the extensions list of the \verb!ClientHello! and \verb!ServerHello! messages. If a non-MPDTLS capable server receives a \verb!ClientHello!, it will ignore the option  as it is specified in the TLS 1.3 specifications (\verb!draft-ietf-tls-tls13!\cite{draft-tls13}). This option is carried as any other TLS Hello Extension (Section 7.3.2.5 from the same draft) with the following format:
+The first step, and the first requirement, was to remain compatible with the standard DTLS client and server. To do that, the MPDTLS extension discovery is made through a new entry in the extensions list of the \texttt{ClientHello} and \texttt{ServerHello} messages. If a non-MPDTLS capable server receives a \texttt{ClientHello}, it will ignore the option  as it is specified in the TLS 1.3 specifications (\texttt{draft-ietf-tls-tls13}\cite{draft-tls13}). This option is carried as any other TLS Hello Extension (Section 7.3.2.5 from the same draft) with the following format:
 
 \addtypes{ExtensionType, byte, Extension}
 \begin{lstlisting}[caption=MultiPath DTLS Extension structure, label=lst:extension]
@@ -29,13 +29,23 @@ enum {
 } ExtensionType;
 \end{lstlisting}
 
-This extension is simply carrying a byte indicating if the host supports MPDTLS or not (so it carry \verb!0x01! or \verb!0x00! respectively).\\
+This extension is simply carrying a byte indicating if the host supports MPDTLS or not (so it carry \texttt{0x01} or \texttt{0x00} respectively).\\
 
-After the exchange of the \verb!HelloVerifyRequest! and \verb!ClientHello! with Cookie, the server will send back a \verb!ServerHello! containing the same extension if it wants to support MPDTLS features. Besides this MPDTLS extension discovery, the handshake is exactly the one from DTLS, keeping the handshake as light as possible.
+After the exchange of the \texttt{HelloVerifyRequest} and \texttt{ClientHello} with Cookie, the server will send back a \texttt{ServerHello} containing the same extension if it wants to support MPDTLS features. Besides this MPDTLS extension discovery, the handshake is exactly the one from DTLS, keeping the handshake as light as possible.
 
 \subsection{Advertising interfaces}
+\label{sec:advertise}
 
-Once the handshake is finished and the initial flow is established, the two hosts can advertise new interfaces available for other sub-flows. This is done within the \verb!ChangeInterfaceMessage! (CIM), a packet carrying multiple addresses. This packet is carried as a DTLS fragment and thus is protected in the same way the Application Data are. The structure of the \verb!CIM! packet is shown in the Listing \ref{lst:cimformat}. We use 16 bytes for the address to be IPv6 compliant. IPv4 addresses can be mapped to/from IPv6 format following \verb!RFC4291!\cite{rfc4291}.  
+As for MPRTP (see Section \ref{sec:mprtp-advetise}), we can explore 2 options for the addresses advertisement : in-band or out-of-band signalling. In-band means we use the same protocol (in this case DTLS) to exchange our addresses while out-of-band will imply another protocol that could be reliable for instance.  For MPDTLS we made the choice to consider only the in-band communication for the following reasons : 
+
+\begin{itemize}
+\item Lower overhead: we don't need any additional protocol and to setup another channel of communication.
+\item The addresses must be communicated securely. We already have a secure channel with DTLS, we don't want to do another handshake with TCP/TLS for example.
+\item The reliability is not a strong requirement. The message carrying all the addresses may be lost, this is not vital for the communication. Moreover, with a small retransmission strategy, it will eventually reach the destination.
+\end{itemize}
+
+
+Once the handshake is finished and the initial flow is established, the two hosts can advertise new interfaces available for other sub-flows. This is done within the \texttt{ChangeInterfaceMessage} (CIM), a packet carrying multiple addresses. This packet is carried as a DTLS fragment and thus is protected in the same way the Application Data are. The structure of the \texttt{CIM} packet is shown in the Listing \ref{lst:cimformat}. We use 16 bytes for the address to be IPv6 compliant. IPv4 addresses can be mapped to/from IPv6 format following \texttt{RFC4291}\cite{rfc4291}. This mapping allows us to keep the size of the packet relatively small when you compare it with the one from MPRTP (Listing \ref{lst:mprtp-advertisement}). Of course we don't support DNS name but in our case it doesn't seem really important. We can always extend the design if a need for other kind of interface advertisement is needed.
 
 \addtypes{ContentType,ProtocolVersion,uint16,uint48,uint64,byte,ChangeInterfaceMessageFragment,DTLSPlainText, NewAddress,select,case}
 \begin{lstlisting}[caption=Change Interface Message structure, label=lst:cimformat]
@@ -69,7 +79,9 @@ struct {
 } NewAddress;
 \end{lstlisting}
 
-The \verb!CIM! contains all the addresses a host wants to share. We decided to always transmit all the addresses to provide redundancy. Also, to be sure we do not lose potential bandwidth, the \verb!CIM!s are retransmitted in case of loss and so are acknowledged. To avoid wasting resources, we use the acknowledgement to transmit the list of addresses of the receiving host. This way, we are sure that each host knows the exact configuration of the other at any time (once the first host received the acknowledgement). An example of the \verb!CIM! exchange is shown in the Figure \ref{fig:CIMexchange}. The message is structured as follow : whether or not it's an acknowledgment (reply bit), the total number of interfaces we are advertising and the list of interfaces (following format presented in Listing \ref{lst:cimformat}). For the sake of clarity, the DTLS informations (such as the epoch, version,\dots) are not represented on Figure \ref{fig:CIMexchange} and the sequence numbers are shown in bold.
+The \texttt{CIM} contains all the addresses a host wants to share. We decided to always transmit all the addresses to provide redundancy. Also, to be sure we do not lose potential bandwidth, the \texttt{CIM}s are retransmitted in case of loss and so are acknowledged. To avoid wasting resources, we use the acknowledgement to transmit the list of addresses of the receiving host. This way, we are sure that each host knows the exact configuration of the other at any time (once the first host received the acknowledgement). This strategy has also been chosen for the retransmission in MPRTP \cite{singh-avtcore-mprtp}.\\
+
+An example of the \texttt{CIM} exchange is shown in the Figure \ref{fig:CIMexchange}. The message is structured as follow: whether or not it's an acknowledgment (reply bit), the total number of interfaces we are advertising and the list of interfaces (following format presented in Listing \ref{lst:cimformat}). For the sake of clarity, the DTLS informations (such as the epoch, version,\dots) are not represented on Figure \ref{fig:CIMexchange} and the sequence numbers are shown in bold.
 
 \begin{figure}[!h]
 \centering
@@ -83,7 +95,7 @@ The \verb!CIM! contains all the addresses a host wants to share. We decided to a
 \declinst{client}{Client}{}
 \declinst{server}{Server}{}
 
-\lost[r]{ChangeInterfaceMessage[[reply=1], 2, client1, client2 ] - \textbf{1}}[t]{}{client}[7]
+\lost[r]{ChangeInterfaceMessage[[reply=1], 2, client1, client2 ] - \textbf{1}}[t]{}{client}[8]
 \settimeout{}{client}[1]
 \nextlevel
 \mess{ChangeInterfaceMessage[[reply=1], 2, client1, client2] - \textbf{2}}[t]{client}[0]{server}[1]
@@ -97,7 +109,7 @@ The \verb!CIM! contains all the addresses a host wants to share. We decided to a
 \label{fig:CIMexchange}
 \end{figure}
 
-To avoid an infinite exchange of \verb!CIM!s, a reply bit is needed and placed into the header of \verb!CIM! to differentiate a new message from an acknowledgement to a previous one. Also, to know which CIM request is acknowledged, its DTLS sequence number is added in the response. The client must store the sequence number of the last CIM emitted. If an ack is received but the client figures out the sequence numbers don't match, he must retransmit.
+To avoid an infinite exchange of \texttt{CIM}s, a reply bit is needed and placed into the header of \texttt{CIM} to differentiate a new message from an acknowledgement to a previous one. Also, to know which CIM request is acknowledged, its DTLS sequence number is added in the response. The client must store the sequence number of the last CIM emitted. If an ack is received but the client figures out the sequence numbers don't match, he must retransmit.
 
 \subsection{Retransmission strategy}
 
@@ -135,13 +147,15 @@ We could point out the fact that the knowledge of the interfaces is only needed 
 
 Of course if some packets were already on the line before the server has received the CIM, we will retransmit multiple times the CIM and therefore waste bandwidth.
 
-Our solution is somehow a mix between the pure timeout and the direct retransmission after every packet. When we first send the \verb!CIM!, we store a timestamp in a variable. For every packets received, we check if the time elapsed is enough and we retransmit the packet and reset the timestamp to the current time. The "enough" is customizable, we could set a default value of 2 RTT for \verb!CIM! retransmission. The main benefit of checking only when we receive packets is that we don't waste bandwidth for dead links and we don't need for parallelization mechanism (e.g. interruptions).
+Our solution is somehow a mix between the pure timeout and the direct retransmission after every packet. When we first send the \texttt{CIM}, we store a timestamp in a variable. For every packets received, we check if the time elapsed is enough and we retransmit the packet and reset the timestamp to the current time. The "enough" is customizable, we could set a default value of 2 RTT for \texttt{CIM} retransmission. The main benefit of checking only when we receive packets is that we don't waste bandwidth for dead links and we don't need for parallelization mechanism (e.g. interruptions).
 
 This strategy will be used for all retransmission of control packets with possibly different thresholds for the timers.
 
 \section{Secure sub-flows establishment}
 
 In the first design of our protocol, we didn't use any handshake to attach new sub-flows to the global connection. Instead, we were creating all the possible sub-flows by combining the host and remote addresses, directly initializing the sockets in connected mode. However, this solution is not suitable in various situations, like NAT-traversals or short-living interfaces. 
+
+Other multipath protocols don't need to explicitly start a new flow. That's the case for MPRTP, the interfaces are just advertised and all possible combinations of 2 interfaces are then acceptable. But MPRTP doesn't have any security concerns as we do.
 
 Using not connected sockets could present a potential weak point for a DoS (Denial of Service) attack. Indeed if an attacker could guess IP addresses of the server, he can send garbage under the form of traditional DTLS packets. This could be computation costly since it forces the server to establish the packet authenticity and involves cryptographic operations. This cost is lighter if we use connected sockets as packets incoming from other addresses or ports than the connected ones are immediately dropped by the UDP stack. Also, this problem does not show up when the involved packets are not cryptographically signed, like the handshake packets. Thus, the solution presented in the Section \ref{sec:breakbeforemake} can overlook this issue as it is based on the shortened DTLS handshake.
 
@@ -151,7 +165,7 @@ To address this issue, we define three scenarios of sub-flow establishment and t
 
 We want to establish a new sub-flow when we have at least one other sub-flow alive. In this situation, we will use the secure communication already established to negotiate the opening of a new connection. Only when the negotiation is completed, a new socket will be created and connected on both side. Thus avoiding any possible DoS attack on the new interface.
 
-To carry this request, we need a new type of packet : \verb!wantConnect!, the structure is shown on Listing \ref{lst:WantConnect}.
+To carry this request, we need a new type of packet : \texttt{wantConnect}, the structure is shown on Listing \ref{lst:WantConnect}.
 
 \addtypes{WantConnectFragment}
 \begin{lstlisting}[caption= WantConnect message structure, label=lst:WantConnect]
@@ -184,7 +198,7 @@ struct {
 
 The field opts can be used to specify options for the incoming connection. \todo{Explain why is it important earlier.} We can for instance include a flag to decide which host initiates the connection since that could be of great help if one of the hosts is behind a NAT. Another option would be the backup flag. When this flag is set to 1, it means we want to use this interface only if no other choice is possible to keep the connection running. Typically, this would be the case for a 4G/LTE interface on a phone because it costs much more than the Wi-Fi.
 
-The host who received a \verb!wantConnect! must acknowledge the reception thanks to a \verb!wantConnectAck! packet (see Listing \ref{lst:WantConnectAck}). Messages can be lost and we need to know to which Packet the acknowledgement is referring to so we include the sequence number of the corresponding packet (i.e. DTLS sequence number). The options are also included to give the opportunity to the other host to accept or deny some of them.
+The host who received a \texttt{wantConnect} must acknowledge the reception thanks to a \texttt{wantConnectAck} packet (see Listing \ref{lst:WantConnectAck}). Messages can be lost and we need to know to which Packet the acknowledgement is referring to so we include the sequence number of the corresponding packet (i.e. DTLS sequence number). The options are also included to give the opportunity to the other host to accept or deny some of them.
 
 \addtypes{WantConnectAckFragment}
 \begin{lstlisting}[caption= wantConnectAck message structure, label=lst:WantConnectAck]
@@ -209,7 +223,7 @@ struct {
 } WantConnectAckFragment;
 \end{lstlisting}
 
-Figure \ref{fig:Handshake1} presents how it will take place when a server has 2 interfaces and the client only one. First the traditional DTLS handshake is established between the client and the public interface of the server (S1). By a \verb!CIM! exchange, the client is aware of the existence of a second interface (S2). He then sends a \verb!wantConnect! request and if this message is correctly received, the server will set up his second interface to receive packets from the client. After this exchange, heartbeat messages \todo{define the frequency} will take place to assess the availability of the link. If for some reasons, the interface is not reachable from the client, then the server will notice he never receives any heartbeat response and will close the socket. Otherwise, a new sub-flow has been established and both hosts can use it to communicate securely. 
+Figure \ref{fig:Handshake1} presents how it will take place when a server has 2 interfaces and the client only one. First the traditional DTLS handshake is established between the client and the public interface of the server (S1). By a \texttt{CIM} exchange, the client is aware of the existence of a second interface (S2). He then sends a \texttt{wantConnect} request and if this message is correctly received, the server will set up his second interface to receive packets from the client. After this exchange, heartbeat messages will take place to assess the availability of the link. The frequency must be defined according to experimentation, so far we recommend to send a heartbeat message at least every 10s. The implementation must use a back-off strategy to prevent waisting resources on a dead link. If for some reasons, the interface is not reachable from the client, then the server will notice he never receives any heartbeat response and will close the socket. Otherwise, a new sub-flow has been established and both hosts can use it to communicate securely. 
 
 
 \begin{figure}[!h]
@@ -255,16 +269,65 @@ When another connection is available, this is the best way to establish a new su
 
 
 \subsection{Break-before-make sub-flows\label{sec:breakbeforemake}}
-Unfortunately, the solution presented in the previous section is not applicable in every situation. For instance, when a smartphone was connected with its Wi-Fi interface and the access point becomes out of range for any reason. The smartphone will then toggle the 4G interface. However, it cannot use the procedure explained in the previous section as it does not have an active sub-flow anymore. To solve this problem, the smartphone can simply use the Session Resumption mechanism available in (D)TLS, resuming in both sides the state of the session as before the link failure. It is also important that the smartphone warns the server that the Wi-Fi interface is no more available by sending a \verb!CIM! as soon as it re-establishes the connection. \todo[inline]{show flow}
+Unfortunately, the solution presented in the previous section is not applicable in every situation. For instance, when a smartphone was connected with its Wi-Fi interface and the access point becomes out of range for any reason. The smartphone will then toggle the 4G interface. However, it cannot use the procedure explained in the previous section as it does not have an active sub-flow anymore. To solve this problem, the smartphone can simply use the Session Resumption mechanism available in (D)TLS, resuming in both sides the state of the session as before the link failure. It is also important that the smartphone warns the server that the Wi-Fi interface is no more available by sending a \texttt{CIM} as soon as it re-establishes the connection. This use case is presented on Figure \ref{fig:dtls-sessionresumption}.
 
-This solution presents the same security properties than the standard Session Resumption proposed in the \verb!RFC5246!\cite{rfc5246}, Section 7.4.1.2. \todo{Explain why it can be used from a different IP address.}
+\begin{figure}[!ht]
+\centering
+\begin{msc}[r]{MultiPath-DTLS session resumption}
 
-\todo[inline]{Compare this approach to the previous one (disadvantage):\\
-    - necessite un serveur d'écoute toujours up (pas le cas avec la précédente)
-}
-If the server cleared the session cache in the meanwhile, the full DTLS handshake will take place and the server and the session will start without any other known remote interface. It is another reason to impose a \verb!CIM! emission as soon as the sub-flow is up.
+\setlength{\instfootheight}{0em}
+\setlength{\instheadheight}{0em}
+\setlength{\instdist}{0.33\linewidth}
+\setlength{\levelheight}{3em}
 
-Finally, we can say that this solution is more general than the previous one, as it can be used in every situation, where the \verb!WantConnect! can only be used when a sub-flow is already established. For this reason, the default way to create a new sub-flow is this one (the full DTLS handshake with the possibility to resume the session) and the \verb!WantConnect! method is the short way to use when another sub-flow is up.
+\declinst{client1}{Client2 (4G)}{}
+\declinst{client2}{Client1 (WiFi)}{}
+\declinst{server}{Server}{}
+
+\mess{DTLS Hanshake}[t]{client2}[0.5]{server}[0]
+\nextlevel
+\mess{DTLS Hanshake}[t]{server}[0.5]{client2}[0]
+\nextlevel
+\mess*{Share session ID}{client2}{client1}[0]
+\nextlevel
+\condition{WiFi Off}{client2}
+\nextlevel
+\stop{client2}
+\condition{4G On}{client1}
+\nextlevel
+\mess{ClientHello (with session id)}[t]{client1}[0.5]{server}[0]
+\nextlevel
+\mess{HelloVerifyRequest}[t]{server}[0.5]{client1}[0]
+\nextlevel
+\mess{ClientHello (with session id, cookie)}[t]{client1}[0.5]{server}[0]
+\nextlevel
+\mess{ServerHello (with same session id)}[t]{server}[0.5]{client1}[0]
+\nextlevel
+\mess{ChangeCipherSpec}[t]{server}[0.5]{client1}[0]
+\nextlevel
+\mess{ChangeCipherSpec}[t]{client1}[0.5]{server}[0]
+\nextlevel
+\mess{ChangeInterface(Client2)}[t]{client1}[0.5]{server}[0]
+\nextlevel
+\mess{ChangeInterface(Server)}[t]{server}[0.5]{client1}[0]
+\nextlevel[2]
+
+\end{msc}
+\caption{Example of how session resumption takes place}
+\label{fig:dtls-sessionresumption}
+\end{figure}
+
+Note this is only possible because Client1 and Client2 are the same machine and therefore share the session ID given by the server. The handshake is faster if the session is still on the server's cache because no certificate exchange is needed and the master key is the same as before.
+
+This solution presents the same security properties than the standard Session Resumption proposed in the \texttt{RFC5246}\cite{rfc5246}, Section 7.4.1.2. The RFC doesn't explicitly limit the session resumption to come from the same IP/port as before but it appears that some implementation do it. It was the case for Firefox and was criticized as a bug by N. Modadugu who is the co-author of DTLS\footnote{\url{https://bugzilla.mozilla.org/show_bug.cgi?id=415196}}. It can't be considered as a vulnerability since even if an attacker can steal the session ID, he doesn't know the master key and therefore won't be able to generate a correct \texttt{ChangeCipherSpec}.
+
+If the server cleared the session cache in the meanwhile, the full DTLS handshake will take place and the server and the session will start without any other known remote interface. It is another reason to impose a \texttt{CIM} emission as soon as the sub-flow is up.
+
+Moreover, for this solution to work, a thread or a process must be constantly listening the interface even if a connection is already initiated. This is not a requirement for the previous solution.
+
+Finally, we can say that this solution is more general than the previous one, as it can be used in every situation, where the \texttt{WantConnect} can only be used when a sub-flow is already established. For this reason, the default way to create a new sub-flow is this one (the full DTLS handshake with the possibility to resume the session) and the \texttt{WantConnect} method is the short way to use when another sub-flow is up.
+
+Nevertheless, this could potentially complicate the implementation if a flow is up and you try to do session resuming with another flow. Indeed, you will find yourself with two separated DTLS sessions and the expected behavior is to merge these two into only one session. This would imply to use some channel of communication between processes (shared memory for instance) and merge objects together. By our experience working with an SSL/TLS library, that wouldn't be easy. So the best solution to establish new flows when at least one other flow is alive stays the \texttt{WantConnect} method.
 
 \subsection{NAT-traversal sub-flows}
 
@@ -274,11 +337,14 @@ However, an overview of the possible scenarios would not be complete without tak
 The general sub-flow establishment method is not altered by the NAT. The only constraint is that the handshake must be initated by the NATed host, to allow the NAT-holing and the correct address discovery.
 
 \subsubsection{Make-before-break}
-The \verb!WantConnect! is carried over an existing link, and so is not affected by the NAT. However, we cannot create the completely connected sockets right from the beginning as we don't already know the port affected by the NAT. Thus the procedure is the same but with a flag in the \verb!WantConnect! indicating which side is behind the NAT. Then, the initiating side creates a connected socket while the other can create a connected socket accepting any port but only listening to the public address of the NAT of the initiating host. This variation is shown in the Figure \ref{fig:HandshakeNAT}. 
 
-We illustrate a specific use case where a client has one interface behind a NAT and another one with public address. This could be the case with the Wi-Fi of the smartphone which is traditionally part of home network. If the server wants to initiate the connection, he will notice in the \verb!CIM! that the second address is a local address (e.g. 192.168.X.X). He includes a special flag in the \verb!wantConnect! to express his desire to connect to this interface. 
+\todo[inline]{This strategy is not valid if two hosts are behind the same NAT. Go back to session resuming ?. Just need to not consider the NAT in such case}
 
-When a NAT is detected we invert the responsibility of initiating the handshake. Therefore, the client sends back a \verb!wantConnect! if he agrees to connect his second interface. Then the communication continues as already explained previously. \todo[inline]{How to secure the port ?}
+The \texttt{WantConnect} is carried over an existing link, and so is not affected by the NAT. However, we cannot create the completely connected sockets right from the beginning as we don't already know the port affected by the NAT. Thus the procedure is the same but with a flag in the \texttt{WantConnect} indicating which side is behind the NAT. Then, the initiating side creates a connected socket while the other can create a connected socket accepting any port but only listening to the public address of the NAT of the initiating host. This variation is shown in the Figure \ref{fig:HandshakeNAT}. 
+
+We illustrate a specific use case where a client has one interface behind a NAT and another one with public address. This could be the case with the Wi-Fi of the smartphone which is traditionally part of home network. If the server wants to initiate the connection, he will notice in the \texttt{CIM} that the second address is a local address (e.g. 192.168.X.X). He includes a special flag in the \texttt{wantConnect} to express his desire to connect to this interface. 
+
+When a NAT is detected we invert the responsibility of initiating the handshake. Therefore, the client sends back a \texttt{wantConnect} if he agrees to connect his second interface. Then the communication continues as already explained previously. \todo[inline]{How to secure the port ?}
 
 \begin{figure}[!h]
 \centering
@@ -328,6 +394,7 @@ When a NAT is detected we invert the responsibility of initiating the handshake.
 
 \newpage
 \section{Feedback on sub-flow}
+\label{sec:mpdtls-feedback}
 
 Last but not least, each packet must be sent on only one flow. Thus, one need to dispatch the packets over the sub-flows, and this is the role of the scheduler. But, to be able to do its work efficiently, the scheduler must be aware of the sub-flows health. To implement this new feature, we propose to add to DTLS a feedback mechanism, gathering various information such as the Forward delay, the drop rate of the link or the global reorder rate. Crossing the information we receive from different sub-flows will allow the scheduler to dispatch packets efficiently.
 
@@ -336,9 +403,9 @@ The transmission delay is an important measure when we want to balance a load ov
 
 The most intuitive way to compute the time taken to realize a task is to compare the time before its beginning and after its completion, which makes no sense when it comes over the network. As the task begins on one host and finishes on the other, we are subject to the clock synchronisation.
 
-However, Fei Song et Al. propose in \cite{song2009estimator} a practical solution that suits our needs. The idea is simple: we don't need to know the exact One-way delay of a subflow, we just need to be able to compare the delays between the different sub-flows. Thus, we can compute the transmission delay of a flow as the difference between the send time and the receive time, with a $\Delta T$ term being the clock desynchronization between the two hosts. This $\Delta T$ is only the clock difference that could exist between the two actors of the connection and thus does not hide any delay or jitter caused by the transmission itself\todo{$\Delta T$ is only the clock desynchronization ! Ok ?}. As the two end-points of each sub-flows are the same, this $\Delta T$ is assumed to be constant over all the sub-flows.
+However, Fei Song et Al. propose in \cite{song2009estimator} a practical solution that suits our needs. The idea is simple: we don't need to know the exact One-way delay of a subflow, we just need to be able to compare the delays between the different sub-flows. Thus, we can compute the transmission delay of a flow as the difference between the send time and the receive time, with a $\Delta T$ term being the clock desynchronization between the two hosts. This $\Delta T$ is only the clock difference that could exist between the two actors of the connection and thus does not hide any delay or jitter caused by the transmission itself. As the two end-points of each sub-flows are the same, this $\Delta T$ is assumed to be constant over all the sub-flows.
 
-Once we know how to estimate the forward delay of each subflow, or at least how to rank them on this criteria, we can easily create a mechanism to compute this estimation, it is illustrated in the Figure \ref{fig:forwardDelayComputation}. To avoid overhead on each DTLS AppData packets, we took the decision to use new dedicated packets to compute the forward delay. Each host will periodically send probe packet containing the current timestamp. When the other host receives it, it can compute the transmission delay modulo $\Delta T$. For the sake of simplicity, only the average of the delay computed will be transmitted in the \verb!feedback! report, as presented in Section \ref{sec:feedbackReport}. The $\Delta T$ is considered constant over time because the clocks are increasing in the same way on all the hosts. As $\Delta T$ is constant, it does not introduce bias in the calculation of the transmission delay average. 
+Once we know how to estimate the forward delay of each subflow, or at least how to rank them on this criteria, we can easily create a mechanism to compute this estimation, it is illustrated in the Figure \ref{fig:forwardDelayComputation}. To avoid overhead on each DTLS AppData packets, we took the decision to use new dedicated packets to compute the forward delay. Each host will periodically send probe packet containing the current timestamp. When the other host receives it, it can compute the transmission delay modulo $\Delta T$. For the sake of simplicity, only the average of the delay computed will be transmitted in the \texttt{feedback} report, as presented in Section \ref{sec:feedbackReport}. The $\Delta T$ is considered constant over time because the clocks are increasing in the same way on all the hosts. As $\Delta T$ is constant, it does not introduce bias in the calculation of the transmission delay average. 
 
 \begin{figure}[!h]
 \begin{minipage}[c]{.55\linewidth}
@@ -373,7 +440,7 @@ Once we know how to estimate the forward delay of each subflow, or at least how 
 \begin{minipage}[c]{.44\linewidth}
 To compute the forward delay, we propose to proceed as follow:\\
 
-The host (\textit{Server} in the Figure \ref{fig:forwardDelayComputation}) sends periodically \verb!Probe! packets containing its current timestamp ($T_x$).\\
+The host (\textit{Server} in the Figure \ref{fig:forwardDelayComputation}) sends periodically \texttt{Probe} packets containing its current timestamp ($T_x$).\\
 
 Once received by the other host (Client$_{\{1,2\}}$), the latter can compute the transmission delay of this particular packet,
 $$FD_1 = T_1 - T_2' + \Delta{}T$$
@@ -391,7 +458,7 @@ Finally, this is this $EFD_{i}$ value that is transmitted to the emitter through
 
 \subsection{Loss rate}
 
-Unlike TCP, we don't receive ack for every packet correctly transmitted. Moreover because DTLS is based on UDP, a loss is actually a normal event. To compute the loss rate, we must then add a new mechanism to support feedback. This is done by sending regularly \verb!feedback! packets from the receiver to the sender. More details about this mechanism including packet structure are presented in section \ref{sec:feedbackReport}. When we talk about sender and receiver, we divide the DTLS connection in two one-way half-connections. So if we put things back together, each host will play the role of a sender and a receiver.
+Unlike TCP, we don't receive ack for every packet correctly transmitted. Moreover because DTLS is based on UDP, a loss is actually a normal event. To compute the loss rate, we must then add a new mechanism to support feedback. This is done by sending regularly \texttt{feedback} packets from the receiver to the sender. More details about this mechanism including packet structure are presented in section \ref{sec:feedbackReport}. When we talk about sender and receiver, we divide the DTLS connection in two one-way half-connections. So if we put things back together, each host will play the role of a sender and a receiver.
 
 In this feedback, we do not want to acknowledge every packet received. Instead we give some information about what we received in the time frame. This include : 
 
@@ -406,14 +473,16 @@ As a receiver, by transmitting these information back to the sender, we give him
 LR = \frac{packets_{sent} - packets_{received}}{packets_{sent}}
 \end{equation*}
 
-Where $packets_{sent}$ is maintained by the sender and $packets_{received}$ is extracted from the feedback. Note that the sender must only keep track of packets with sequence number greater than the last max sequence number received from the last feedback. By doing so, the space used to store these sequence numbers will be kept reasonably small. In the case we don't receive anymore feedback, we will progressively send less and less packets to this address until we send no more. Therefore, there is no way we exceed sender's memory simply because the receiver is dead. \todo[inline]{Any practical suggestion ? Cite sources ! MPRTP}
+Where $packets_{sent}$ is maintained by the sender and $packets_{received}$ is extracted from the feedback. Note that the sender must only keep track of packets with sequence number greater than the last max sequence number received from the last feedback. By doing so, the space used to store these sequence numbers will be kept reasonably small. In the case we don't receive anymore feedback, we will progressively send less and less packets to this address until we send no more. Therefore, there is no way we exceed sender's memory simply because the receiver is dead. To do so, a back-off timer will be set up for the heartbeat messages. Such a timer will increase exponentially and above a certain threshold, we consider the link as broken. Nevertheless, a good scheduler will stop sending packets before the threshold is reached by looking at the number of packets not yet acknowledged. 
+
+If one interface goes offline and at least one other link is still available, a CIM must be send to warn the other host. The latest draft of MPRTP \cite{singh-avtcore-mprtp} Section 7.4 relies also on the communication between the host and the endpoint to explicitly discard one subflow.
 
 
 \subsection{Feedback reporting}
 \label{sec:feedbackReport}
 
 
-Figure \ref{fig:feedback} presents an example of how feedback takes place once the communication is well established. After a reasonable number of packets is received (2 in the example), we trigger the emission of a \verb!Feedback! . Sequence numbers are put beside each message.
+Figure \ref{fig:feedback} presents an example of how feedback takes place once the communication is well established. After a reasonable number of packets is received (2 in the example), we trigger the emission of a \texttt{Feedback} . Sequence numbers are put beside each message.
 
 
 \begin{figure}[!h]
@@ -444,14 +513,14 @@ Figure \ref{fig:feedback} presents an example of how feedback takes place once t
 \label{fig:feedback}
 \end{figure}
 
-The structure of \verb!feedbackMessage! is presented in Listing \ref{lst:feedbackM}. In the example \verb!Feedback(2,1,3)! means that we have received 2 packets since the last acknowledged feedback. The minimum and maximum sequence number received are 1 and 3 respectively. The client replies with a \verb!feedbackAckMessage! carrying the sequence number of the corresponding \verb!feedbackMessage!.
+The structure of \texttt{feedbackMessage} is presented in Listing \ref{lst:feedbackM}. In the example \texttt{Feedback(2,1,3)} means that we have received 2 packets since the last acknowledged feedback. The minimum and maximum sequence number received are 1 and 3 respectively. The client replies with a \texttt{feedbackAckMessage} carrying the sequence number of the corresponding \texttt{feedbackMessage}.
 
-The size of the sequence number is directly taken from the \verb!RFC6347!\cite{rfc6347} while we consider 8 bytes to be enough to count the packets. The threshold which triggers the transmission of a feedback must be fixed way before this limit to provide useful information even at Gigabit speed. But in case some feedback or feedbackAck are lost, we must handle more than usual values. Indeed, as long as no acknowledgement has been received, the receiver will continue to send incremental feedback (i.e. the new feedback contains information about packets already reported in old feedback but not acknowledged).
+The size of the sequence number is directly taken from the \texttt{RFC6347}\cite{rfc6347} while we consider 8 bytes to be enough to count the packets. The threshold which triggers the transmission of a feedback must be fixed way before this limit to provide useful information even at Gigabit speed. But in case some feedback or feedbackAck are lost, we must handle more than usual values. Indeed, as long as no acknowledgement has been received, the receiver will continue to send incremental feedback (i.e. the new feedback contains information about packets already reported in old feedback but not acknowledged).
 
 
 \addtypes{FeedbackFragment, FeedbackAckFragment}
 
-\begin{lstlisting}[caption= Feedback message structure, label=lst:feedbackM]
+\begin{lstlisting}[caption= Feedback and Feedback Ack messages structure, label=lst:feedbackM]
 struct {
     ContentType type;
     ProtocolVersion version;
@@ -460,11 +529,12 @@ struct {
     uint16 length;
     select (ContentType) {
         case feedback: FeedbackFragment; // New field
+        case feedback_ack: FeedbackAckFragment; // New field
     } fragment;
 } DTLSPlaintext;
 
 enum {
-    feedback(TBD), (65535)
+    feedback(TBD), feedback_ack(TBD), (65535)
 } ContentType;
 
 struct {
@@ -473,29 +543,16 @@ struct {
   uint48 max_sequence_number;
   uint64 average_forward_delay;
 } FeedbackFragment;
-\end{lstlisting}
-
-A \verb!feedbackMessage! is actually a modified DTLS \verb!ApplicationData! packet. In particular, it possess a signed sequence number. The latter can be used in the \verb!feedbackAckMessage! to identify uniquely this packet. In case of retransmission/loss when we receive a feedbackAck, we always know to which feedback it refers to.
-
-\begin{lstlisting}[caption = Feedback Ack structure, label=lst:feedbackA]
-struct {
-    ContentType type;
-    ProtocolVersion version;
-    uint16 epoch;
-    uint48 sequence_number;
-    uint16 length;
-    select (ContentType) {
-        case feedback_ack: FeedbackAckFragment; // New field
-    } fragment;
-} DTLSPlaintext;
-
-enum {
-    feedback_ack(TBD), (65535)
-} ContentType;
 
 struct {
   uint32 feedback_sequence_number;
-} FeedbackFragment;
+} FeedbackAckFragment;
 \end{lstlisting}
 
+A \texttt{feedbackMessage} is actually a modified DTLS \texttt{ApplicationData} packet. In particular, it possess a signed sequence number. The latter can be used in the \texttt{feedbackAckMessage} to identify uniquely this packet. In case of retransmission/loss when we receive a feedbackAck, we always know to which feedback it refers to.
+
 Feedback reporting is done on a regular basis. The threshold to send a feedback is to be defined accordingly to the bandwidth of the link. On a gigabit speed link for example, we will not send feedback every 10 packets but this could be the case in a low bandwidth, high latency environment.
+
+\section{Impact of TLS 1.3 modifications}\label{sec:tls13impact}
+
+\todo[inline]{Write this}
