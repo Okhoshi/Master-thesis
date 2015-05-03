@@ -108,10 +108,10 @@ The benefits to this requirement are stated in the original DTLS paper \cite{mod
 \begin{itemize}
 \item The DTLS layer does not need to buffer partial records, host memory can be used more efficiently.
 \item It is quite possible that datagrams carrying the remaining record fragments are lost, in which case the received fragments are useless and cannot be processed.
-\item Buffering record fragments would unnecessarily complicate a DTLS implementation without providing any obvious benefits.
+\item Buffering record fragments would unnecessarily complicate a DTLS implementation without providing any obvious benefit.
 \end{itemize}
 
-Note that even if everything is done to avoid IP fragmentation whenever it is possible, DTLS will still operate correctly on top of re-assembly since it is transparently handled by the kernel.
+Note that even if IP fragmentation occurs, DTLS will still operate correctly on top of re-assembly since it is transparently handled by the kernel.
 
 The TLS handshake message is modified as shown on Listing \ref{lst:dtls-handshake}. The handshake message following this structure is also encapsulated into the record layer presented on Listing \ref{lst:dtls-record}.
 
@@ -141,12 +141,11 @@ The TLS handshake message is modified as shown on Listing \ref{lst:dtls-handshak
 
 \subsubsection{Anti-Replay strategy}
 
-In TLS, sequence numbers follow sequentially and a packet cannot be replayed because the HMAC verification will fail immediately. Such a drastic solution cannot be apply in DTLS because reordering or losses may occur. The DTLS 1.2 RFC \cite{rfc6347} sec. 4.1.2.6 describes the procedure to avoid replay using a sliding window. This strategy considers packets as valid even if they have been delayed or reordered as long as they are relatively close from the latest packets received. At the same time, the implementation must remember the packets received inside the sliding window and silently discard replayed packets. Therefore, the MAC verification will only be done if the packets has not been received, otherwise an undesirable packet is discarded at the record layer stage.
-
+In TLS, sequence numbers follow sequentially and a packet cannot be replayed because the HMAC verification will fail immediately. Such a drastic solution cannot be applied in DTLS because reordering or losses may occur. The DTLS 1.2 RFC \cite{rfc6347} sec. 4.1.2.6 describes the procedure to avoid replay using a sliding window. This strategy considers packets as valid even if they have been delayed or reordered while they are relatively close from the latest packets received. At the same time, the implementation must remember the packets received inside the sliding window and silently discard the replayed packets. Therefore, the MAC verification will only be done if the packets have not already been received, otherwise an undesirable packet is discarded at the record layer stage.\todo{Check this sentence}
 
 \subsubsection{Anti-DoS for the handshake}
 
-In order to prevent DoS (Denial of Service) attacks, DTLS adds an additional step in comparison with the TLS handshake. Indeed, an attacker could send a lot of \texttt{Client Hello} messages and the server will have to keep a state for each of them, rapidly increasing the memory needed. Instead, the first \texttt{Client Hello} will not trigger a \texttt{Server Hello} directly but a \texttt{Hello Verify Request}. This message only carry the protocol version and a cookie as presented in Listing \ref{lst:dtls-helloverify}. This cookie must be retransmitted in the next Client Hello message. As we can seen on Listing \ref{lst:dtls-clienthello}, a new field has effectively been added to the \texttt{ClientHello} message.
+In order to prevent DoS (Denial of Service) attacks, DTLS adds an additional step in comparison with the TLS handshake. Indeed, an attacker could send a lot of \texttt{ClientHello} messages and the server will have to keep a state for each of them, rapidly increasing the memory needed. Instead, the first \texttt{ClientHello} will not directly trigger a \texttt{ServerHello} but a \texttt{HelloVerifyRequest}. This message only carries the protocol version and a cookie as presented in Listing \ref{lst:dtls-helloverify}. This cookie must be retransmitted in the next Client Hello message. As we can seen on Listing \ref{lst:dtls-clienthello}, a new field has effectively been added to the \texttt{ClientHello} message.
 
 \addtypes{ProtocolVersion, opaque}
 \begin{lstlisting}[caption=DTLS HelloVerifyRequest message, label=lst:dtls-helloverify]
@@ -179,17 +178,15 @@ The additional \texttt{HelloVerifyRequest} message is also a counter measure aga
 \label{fig:amp_attack}
 \end{figure}
 
-For DTLS, the \texttt{ServerHello} is not larger than the \texttt{ClientHello} but amplification attack could still be possible (without the \texttt{HelloVerifyRequest}). Indeed other messages are sent together with the \texttt{ServerHello} including the one carrying the certificate (that could be quite large). Therefore, the additional step introduced with the \texttt{HelloVerifyRequest} (which is relatively small) prevents this kind of attack because the client has to prove he can answer at this address.
+For DTLS, the \texttt{ServerHello} is not larger than the \texttt{ClientHello} but amplification attack could still be possible (without the \texttt{HelloVerifyRequest}). Indeed, other messages are sent together with the \texttt{ServerHello}, including the one carrying the certificate (that could be quite large). Therefore, the additional step introduced with the \texttt{HelloVerifyRequest} (which is relatively small) prevents this kind of attack because the client has to prove it can answer at this address.
 
-
-
-When the client send his first \texttt{ClientHello}, the cookie is initially empty. The server will then generate a new cookie which allows for a stateless exchange, the server sends the \texttt{HelloVerifyRequest} and doesn't remember anything about the client\footnote{This is indeed an exception to the retransmission measures. A \texttt{HelloVerifyRequest} will never be retransmitted, the client must first send another \texttt{ClientHello}.}. The DTLS server should generate cookies in such a way that they can be verified without retaining any per-client state on the server. A way to compute it is given in the RFC6347 section 4.2 \cite{rfc6347}:
+When the client sends its first \texttt{ClientHello}, the cookie field is initially empty. The server will then generate a new cookie which allows for a stateless exchange. It sends the \texttt{HelloVerifyRequest} with the cookie and doesn't remember anything about the client\footnote{This is indeed an exception to the retransmission measures. A \texttt{HelloVerifyRequest} will never be retransmitted, the client must first send another \texttt{ClientHello}.}. The DTLS server must generate cookies in such a way that they can be verified without retaining any per-client state on the server. A way to compute it is given in the RFC6347 section 4.2 \cite{rfc6347}:
 
 \begin{lstlisting}
 Cookie = HMAC(Secret, Client-IP, Client-Parameters)
 \end{lstlisting}
 
-The secret is random and generated by the server. It could be refreshed periodically to invalidate previous cookies. Once a \texttt{ClientHello} has been received with a cookie, the server recomputes it and if they match, the connection can continue as in TLS with a \texttt{ServerHello} message.
+The \texttt{Secret} is random and generated by the server. It could be periodically refreshed to invalidate previous cookies. Once a \texttt{ClientHello} has been received with a cookie, the server recomputes it and if both match, the connection can continue as in TLS with a \texttt{ServerHello} message.
 
 \section{Typical DTLS communication}
 
@@ -234,18 +231,18 @@ The secret is random and generated by the server. It could be refreshed periodic
 \end{figure}
 
 
-Figure \ref{fig:dtls-handshake} depicts a typical handshake with authentication of the server only and the ECDHE-RSA cipher suite\footnote{It means that Elliptic Curve Diffie-Hellman ephemeral is used for the key exchange and RSA for the signature.}. All messages before the \texttt{Change Cipher Spec} are part of epoch 0. Their role is to negotiate the algorithms that will be used to compute the master key. The \texttt{Client Hello} has also the role to carry potential extensions supported by the client. If the server supports them as well, it will include them in the following \texttt{Server Hello} message. This is also where we chose to advertise our MPDTLS extension as explained in Chapter \ref{chap:design}.
+Figure \ref{fig:dtls-handshake} depicts a typical handshake with authentication of the server only and the ECDHE-RSA cipher suite\footnote{It means that Elliptic Curve Diffie-Hellman ephemeral is used for the key exchange and RSA for the signature.}. All messages before the \texttt{ChangeCipherSpec} are part of epoch 0. Their role is to negotiate the algorithms that will be used to compute the master key. The \texttt{Client Hello} has also the role to carry potential extensions supported by the client. If the server supports them as well, it will include them in the following \texttt{Server Hello} message. This is also where we chose to advertise our MPDTLS extension as explained in Chapter \ref{chap:design}.
 
-The only difference with TLS (Section \ref{sec:tls}) is the presence of a second \texttt{Client Hello}. The first one is sent with no cookie and the second one must repeat the cookie received with the \texttt{Hello Verify Request}. Then the server confirms the cipher suite to be used through the \texttt{Server Hello} and directly sends his certificate and his ephemeral public key\footnote{In the case of ECDHE, it consists of the public DH parameters. Namely the domain parameters to define a particular curve.} including a signature of all previous exchanged messages. Finally the server send the \texttt{Server Hello Done} to explicitly say that the handshake is finished on his side.
+The only difference with TLS (Section \ref{sec:tls}) is the presence of a second \texttt{ClientHello}. The first one is sent with no cookie and the second one must repeat the cookie received with the \texttt{HelloVerifyRequest}. Then the server confirms the cipher suite to be used through the \texttt{ServerHello} and directly sends its certificate and its ephemeral public key\footnote{In the case of ECDHE, it consists of the public DH parameters. Namely the domain parameters to define a particular curve.} including a signature of all previous exchanged messages. Finally the server sends the \texttt{ServerHelloDone} to explicitly say that the handshake is finished on its side.
 
-Thereafter the client must also send his DH ephemeral public key. At this point both parties have all the elements in their hands to compute the premaster secret. Note that unlike RSA, the secret is never communicated across the channel. With the random information exchanged through the \texttt{Client Hello} and \texttt{Server Hello}, each host can also compute the master key on his side. Consequently each peer will use this key to deduce the set of keys used to communicate in the next epoch. The first messages of epoch 1 are the \texttt{Change Cipher Spec} messages. They explicitly mark the separation between the handshake and the rest of the communication. Even if they are already encrypted with the symmetric keys and are technically separated from the handshake, they are still considered as being part of it from a conceptual point of view.
+Thereafter the client must also send its DH ephemeral public key. At this point, both parties have all the elements in their hands to compute the premaster secret. Note that unlike RSA, the secret is never communicated through the channel. With the random information exchanged through the \texttt{ClientHello} and \texttt{ServerHello}, each host can also compute the master key on its side. Consequently each peer will use this key to derive the set of keys used to communicate in the next epoch. The first messages of epoch 1 are the \texttt{ChangeCipherSpec} messages. They explicitly mark the separation between the handshake and the rest of the communication. Even if they are technically separated from the handshake, they are still considered as being part of it from a conceptual point of view.
 
 
 \subsection{Application data}
 
-Once the handshake has been completed, the peers can exchange Application Data packets. They are encapsulated into a Record Layer (Listing \ref{lst:dtls-record}) and encrypted and authenticated using the parameters negotiated earlier. 
+Once the handshake has been completed, the peers can exchange Application Data packets. They are first encrypted and authenticated using the parameters negotiated earlier, then encapsulated into a Record Layer (Listing \ref{lst:dtls-record}).
 
-DTLS doesn't bring any additional guarantee concerning the reliability of the link. As shown in Figure \ref{fig:dtls-data}, packets may be lost on the way and the application must deal with it. The sequence number for each message is indicated between chevrons. Because sequence numbers are carried in clear inside the record layer, each host knows how to verify the MAC and therefore the authenticity of the packet.
+DTLS doesn't bring any additional guarantee concerning the reliability of the link. As shown in Figure \ref{fig:dtls-data}, packets may be lost on the way and the application must deal with it. The sequence number for each message is indicated between chevrons. Sequence numbers are carried in clear inside the record layer, so each host knows how to verify the MAC and authenticate the packet.
 
 \begin{figure}[!h]
 \centering
@@ -259,7 +256,7 @@ DTLS doesn't bring any additional guarantee concerning the reliability of the li
 \declinst{client}{Client}{}
 \declinst{server}{Server}{}
 
-\mess{Application Data \textbf{<1>}}[t]{client}[0.3]{server}[1]
+\mess{Application Data <1>}[t]{client}[0.3]{server}[1]
 \nextlevel
 \mess{Application Data <1>}[t]{server}[0.3]{client}[1]
 \nextlevel
@@ -280,15 +277,15 @@ DTLS doesn't bring any additional guarantee concerning the reliability of the li
 
 \label{sec:dtls-usage}
 
-DTLS can be used almost everywhere UDP is used. We can think about applications such as VoIP (Voice over IP), multimedia, online gaming. Every application that wants to secure its communication but can still benefits from faster transmission time of UDP may take advantage of using DTLS.
+DTLS can be used almost everywhere UDP is used. We can think about applications such as VoIP (Voice over IP), multimedia, online gaming. Every application that wants to secure its communication but still benefit from faster transmission time of UDP may take advantage of using DTLS.
 
-Of course the application has to cope with losses or reordering, but this is already the case for real time communication. In telephony, you replace the missing packets by blank sounds. For online gaming, high speed communication between the server and the client is needed to determine the character's position for instance. But if one packet is lost , the position can be determined by the next packet and the application will not be disturbed.
+Of course the application has to cope with losses or reordering, but this is already the case for real time communication. As regards telephony, blank sounds replace the missing packets. For online gaming, high speed communication between the server and the client is needed to determine the character's position for instance. But if one packet is lost, the position can be determined by the next packet and the application will not be disturbed.
 
-For video streaming applications, techniques are used to introduce a slight redundancy at the codec level in such a way that if you lose some packets, one frame may be missing but a least the video is still watchable\footnote{Of course, the application must a use a proper codec and compression method.}. You can also introduce a small buffer to handle reordering.
+For video streaming applications, techniques are used to introduce a slight redundancy at the codec level in such a way that if some packets are lost, one frame may be missing but at least the video is still watchable\footnote{Of course, the application must a use a proper codec and compression method.}. It is also possible to introduce a small buffer to handle reordering.
 
-In a recent Internet draft \cite{dtls-as-subtransport}, companies are trying to make DTLS the default sub-transport protocol for all application-level protocols if security is needed. This will elevate DTLS to the rank of "good practice" whenever one wants to do something secure. 
+In a recent Internet draft \cite{dtls-as-subtransport}, companies are trying to make DTLS the default sub-transport protocol for all application-level protocols when security is needed. This will raise DTLS to the rank of "good practice" for secured communications.
 
-Another important use case for DTLS comes with its integration in WebRTC\footnote{\url{http://www.webrtc.org/}}. This is an open project which has an objective to bring real time communications to browsers and mobile applications via simple APIs. In this context, DTLS has been chosen to ensure the communication between two peers (i.e. browsers or mobile apps). The internet draft describing the security architecture of WebRTC \cite{ietf-rtcweb-security-arch} proposes to use SRTP over DTLS for multimedia communications and DTLS alone for any other kind of data. Figure \ref{fig:webrtc} is taken from a presentation \cite{rescorla2011proposed} by E.Rescorla and  presents how the connection is setup in this proposed design.  
+Another important use case for DTLS comes with its integration in WebRTC\footnote{\url{http://www.webrtc.org/}}. This is an open project which has an objective to bring real time communications to browsers and mobile applications via simple APIs. In this context, DTLS has been chosen to ensure the communication between two peers (i.e. browsers or mobile apps). The internet draft describing the security architecture of WebRTC \cite{ietf-rtcweb-security-arch} proposes to use SRTP over DTLS for multimedia communications and DTLS alone for any other kind of data. Figure \ref{fig:webrtc} is taken from a presentation \cite{rescorla2011proposed} made by E.Rescorla and shows how the connection is set up in this proposed design.  
 
 \begin{figure}[!ht]
 \centering
@@ -297,10 +294,9 @@ Another important use case for DTLS comes with its integration in WebRTC\footnot
 \label{fig:webrtc}
 \end{figure}
 
-By the peer to peer nature of this application, a signalling server is needed to act as a "rendez-vous" and perform NAT traversal. Then the handshake can take place and identity providers issue and verify certificates. Finally all data are transmitted through the DTLS transmission and multiple SRTP sessions can use the same DTLS session. 
+By the peer to peer nature of this application, a signalling server is needed to act as a "rendez-vous" point and to perform NAT traversal. Then the handshake can take place and identity providers issue and verify certificates. Finally all data are transmitted through the DTLS transmission and multiple SRTP sessions can use the same DTLS session. 
 
-
-In short, all these applications may benefit from using DTLS but also MPDTLS as it will allow for more resiliency and better performances. We will demonstrate that in the following chapters.
+To sum up, all these applications may benefit from using DTLS but also MPDTLS as it will allow more resilience and better performances. We will demonstrate this point in the following chapters.
 
 \section{Security considerations}
 
@@ -310,7 +306,7 @@ In short, all these applications may benefit from using DTLS but also MPDTLS as 
 
 The heartbeat extension is unfortunately known for the famous heartbleed bug\footnote{\url{http://heartbleed.com/}} detected in April 2014. Every server using OpenSSL at this time was vulnerable and part of the memory could be retrieved (including private keys, passwords\dots). It is important to note that the error came from the implementation of the extension inside OpenSSL and not from the standard itself.
 
-Anyway, this extension can be really useful to assess the availability of a link and also provide a keep-alive feature. It is quite simple but it also allows for extensibility and new messages as stated in RFC6520 \cite{rfc6520}. The structure of a heartbeat message is presented on Listing \ref{lst:hb-msg}. These will take place on top of the Record Layer (Listing \ref{lst:dtls-record}). The advertisement of this extension is made through a Hello extension. It also defines the behavior of the hosts upon the reception of Heartbeat messages.
+Anyway, this extension can be really useful to assess the availability of a link and also provides a keep-alive feature. It is quite simple but it also allows for extensibility and new messages as stated in RFC6520 \cite{rfc6520}. The structure of a heartbeat message is presented on Listing \ref{lst:hb-msg}. This will take place on top of the Record Layer (Listing \ref{lst:dtls-record}). The advertisement of this extension is made through a Hello extension. It also defines the behavior of the hosts upon the reception of Heartbeat messages.
 
 \addtypes{HeartbeatMessageType}
 \begin{lstlisting}[caption=Heartbeat message, label=lst:hb-msg]
@@ -322,7 +318,7 @@ struct {
 } HeartbeatMessage;
 \end{lstlisting}
 
-For now, only two types of Heartbeat messages are in use : \texttt{HeartbeatRequest} and\\ \texttt{HeartbeatResponse}. The response must contain the same payload as the one in the request triggering it. A simple exchange is presented on Figure \ref{fig:heartbeat}.
+For now, only two types of Heartbeat messages are in use : \texttt{HeartbeatRequest} and \texttt{HeartbeatResponse}. The response must contain the same payload as the one in the request triggering it. A simple exchange is presented on Figure \ref{fig:heartbeat}.
 
 \begin{figure}[!h]
 \centering

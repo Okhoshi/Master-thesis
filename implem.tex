@@ -1,11 +1,11 @@
 \chapter{Implementation}\label{chap:implementation}
 
-Since we designed MPDTLS as an extension for DTLS, it was logical to not implement it from scratch but start from an existing implementation of DTLS. Multiple libraries implement the latest version \footnote{\url{https://en.wikipedia.org/wiki/Datagram_Transport_Layer_Security\#Implementations}}, but we choose wolfSSL \cite{wolfssl} (previously CyaSSL) as our starting point.
+Since we designed MPDTLS as an extension for DTLS, it was logical not to implement it from scratch but to start from an existing implementation of DTLS. Multiple libraries implement the latest version \footnote{\url{https://en.wikipedia.org/wiki/Datagram_Transport_Layer_Security\#Implementations}}, but we chose wolfSSL \cite{wolfssl} (previously CyaSSL) as our starting point.
 
-The choice was done following multiple criteria :
+The choice was driven by the following criteria :
 
 \begin{itemize}
-\item Clarity of code
+\item Code readability
 \item Documentation
 \item Existing examples
 \item Library size
@@ -13,7 +13,7 @@ The choice was done following multiple criteria :
 
 Unlike OpenSSL, wolfSSL contains a reduced number of files to handle SSL/TLS and DTLS. The objective of this library is to be as light as possible to allow integration in embedded systems. As stated in their official website \footnote{\url{http://www.yassl.com/yaSSL/Home.html}}, the library is up to 20 times smaller than OpenSSL.
 
-A documentation and working examples are provided to help people using it. For all these reasons, we chose to go with wolfSSL. In the following sections, we are going to explain how this library works, how we integrate our additions to DTLS and the various problems we had to face during the implementation.
+Documentation and working examples are provided to help its use. For all these reasons, we chose to work with wolfSSL. In the following sections, we are going to explain how this library works, how we integrate our additions to DTLS and the various issues we faced during the implementation.
 
 \section{Packet reception}
 The first step is to make the library recognizes the new packets and handles them correctly, like issuing a \texttt{FeedbackAck} upon reception of a \texttt{Feedback}. This part is quite easy once the internal flow followed by the received packets is understood. The flow we are going to explain is pictured in the Figure \ref{fig:readdiag}. The call related to mutex are not part of the original wolfSSL code and are explained in the Section \ref{sec:threadsafe}.

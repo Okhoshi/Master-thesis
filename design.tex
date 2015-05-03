@@ -10,11 +10,11 @@ In this chapter, we will explore the different additions and modifications made 
 
 \section{Multi-Path advertisement}
 
-Our main purpose is to establish this protocol as an extension of DTLS. In this way, we can reuse as much as possible the principles established by Rescorla and Modadugu in \cite{modadugu2004design}. This also explains why we tried not to change the existing DTLS frames and instead to add new frames for new usages.
+Our main purpose is to set up this protocol as an extension of DTLS. In this way, we can reuse as much as possible the principles established by Rescorla and Modadugu in \cite{modadugu2004design}. This also explains why we tried not to change the existing DTLS frames and to add instead new frames for new usages.
 
 \subsection{Extension discovery}
 
-The first step, and the first requirement, was to remain compatible with the standard DTLS client and server. To do that, the MPDTLS extension discovery is made through a new entry in the extensions list of the \texttt{ClientHello} and \texttt{ServerHello} messages. If a non-MPDTLS capable server receives a \texttt{ClientHello}, it will ignore the option  as it is specified in the TLS 1.3 specifications (\texttt{draft-ietf-tls-tls13}\cite{draft-tls13}). This option is carried as any other TLS Hello Extension (Section 7.3.2.5 from the same draft) with the following format:
+The first step, and the first requirement, was to remain compatible with the standard DTLS client and server. To do that, the MPDTLS extension discovery is made through a new entry in the extensions list of the \texttt{ClientHello} and \texttt{ServerHello} messages. If a MPDTLS-unable server receives a \texttt{ClientHello}, it will ignore the option as it is specified in the TLS 1.3 specifications (\texttt{draft-ietf-tls-tls13}\cite{draft-tls13}). This option is carried as any other TLS Hello Extension (Section 7.3.2.5 from the same draft) with the following format:
 
 \addtypes{ExtensionType, byte, Extension}
 \begin{lstlisting}[caption=MultiPath DTLS Extension structure, label=lst:extension]
@@ -36,11 +36,11 @@ After the exchange of the \texttt{HelloVerifyRequest} and \texttt{ClientHello} w
 \subsection{Advertising interfaces}
 \label{sec:advertise}
 
-As for MPRTP (see Section \ref{sec:mprtp-advetise}), we can explore 2 options for the addresses advertisement : in-band or out-of-band signalling. In-band means we use the same protocol (in this case DTLS) to exchange our addresses while out-of-band will imply another protocol that could be reliable for instance.  For MPDTLS we made the choice to consider only the in-band communication for the following reasons : 
+Like in MPRTP (see Section \ref{sec:mprtp-advetise}), we can explore 2 options for the addresses advertisement : in-band or out-of-band signalling. "In-band" means we use the same protocol (in this case DTLS) to exchange our addresses while "out-of-band" will imply another protocol that could be reliable for instance. For MPDTLS, we made the choice to consider only the in-band communication for the following reasons : 
 
 \begin{itemize}
-\item Lower overhead: we don't need any additional protocol and to setup another channel of communication.
-\item The addresses must be communicated securely. We already have a secure channel with DTLS, we don't want to do another handshake with TCP/TLS for example.
+\item Lower overhead: we don't need any additional protocol or to set up another channel of communication.
+\item The addresses must be communicated securely. We already have a secure channel with DTLS, it is thus unnecessary to do another handshake with TCP/TLS.
 \item The reliability is not a strong requirement. The message carrying all the addresses may be lost, this is not vital for the communication. Moreover, with a small retransmission strategy, it will eventually reach the destination.
 \end{itemize}
 
@@ -81,7 +81,7 @@ struct {
 
 The \texttt{CIM} contains all the addresses a host wants to share. We decided to always transmit all the addresses to provide redundancy. Also, to be sure we do not lose potential bandwidth, the \texttt{CIM}s are retransmitted in case of loss and so are acknowledged. To avoid wasting resources, we use the acknowledgement to transmit the list of addresses of the receiving host. This way, we are sure that each host knows the exact configuration of the other at any time (once the first host received the acknowledgement). This strategy has also been chosen for the retransmission in MPRTP \cite{singh-avtcore-mprtp}.\\
 
-An example of the \texttt{CIM} exchange is shown in the Figure \ref{fig:CIMexchange}. The message is structured as follow: whether or not it's an acknowledgment (reply bit), the total number of interfaces we are advertising and the list of interfaces (following format presented in Listing \ref{lst:cimformat}). For the sake of clarity, the DTLS informations (such as the epoch, version,\dots) are not represented on Figure \ref{fig:CIMexchange} and the sequence numbers are shown in bold.
+An example of the \texttt{CIM} exchange is shown in the Figure \ref{fig:CIMexchange}. The message is structured as follows: the fact that it is an acknowledgement or not (reply bit), the total number of interfaces we are advertising and the list of interfaces (following format presented in Listing \ref{lst:cimformat}). For the sake of clarity, the DTLS informations (such as the epoch, version,\dots) are not represented on Figure \ref{fig:CIMexchange} and the sequence numbers are shown between chevrons.
 
 \begin{figure}[!h]
 \centering
@@ -95,12 +95,12 @@ An example of the \texttt{CIM} exchange is shown in the Figure \ref{fig:CIMexcha
 \declinst{client}{Client}{}
 \declinst{server}{Server}{}
 
-\lost[r]{ChangeInterfaceMessage[[reply=1], 2, client1, client2 ] - \textbf{1}}[t]{}{client}[8]
+\lost[r]{ChangeInterfaceMessage[[reply=1], 2, client1, client2 ] - <1>}[t]{}{client}[8]
 \settimeout{}{client}[1]
 \nextlevel
-\mess{ChangeInterfaceMessage[[reply=1], 2, client1, client2] - \textbf{2}}[t]{client}[0]{server}[1]
+\mess{ChangeInterfaceMessage[[reply=1], 2, client1, client2] - <2>}[t]{client}[0]{server}[1]
 \nextlevel
-\mess{ChangeInterfaceMessage[[reply=0,ack=2], 1, server1] - \textbf{1}}[b]{server}[1]{client}[1]
+\mess{ChangeInterfaceMessage[[reply=0,ack=2], 1, server1] - <1>}[b]{server}[1]{client}[1]
 \nextlevel
 \nextlevel
 
@@ -109,14 +109,13 @@ An example of the \texttt{CIM} exchange is shown in the Figure \ref{fig:CIMexcha
 \label{fig:CIMexchange}
 \end{figure}
 
-To avoid an infinite exchange of \texttt{CIM}s, a reply bit is needed and placed into the header of \texttt{CIM} to differentiate a new message from an acknowledgement to a previous one. Also, to know which CIM request is acknowledged, its DTLS sequence number is added in the response. The client must store the sequence number of the last CIM emitted. If an ack is received but the client figures out the sequence numbers don't match, he must retransmit.
+To avoid an infinite exchange of \texttt{CIM}s, a reply bit is needed and placed into the header of \texttt{CIM} to differentiate a new message from an acknowledgement to a previous one. Also, to know which CIM request is acknowledged, its DTLS sequence number is added in the response. The client must store the sequence number of the last CIM emitted. When an \texttt{CIM} is received but the host realizes the stored sequence number doesn't match the received ack, it must retransmit the \texttt{CIM}.
 
 \subsection{Retransmission strategy}
 
+A CIM message must be retransmitted if the reply is not received because the packet may be lost. How do we monitor the reception ? We could use a timeout to retransmit after a certain period of time. But if the other host is definitely dead, we will send packets for nothing before we figure out.
 
-A CIM message must be retransmitted if the reply is not received because the packet may be lost. How do we monitor the reception ? We could use a timeout to retransmit after a certain amount of time. But if the other host is definitely dead, we will send packets for nothing before we notice.
-
-We could point out the fact that the knowledge of the interfaces is only needed when the host is actually using them (i.e. sending packets). Therefore, we could think of a mechanism which retransmits only when we have proof that the other is still alive : when we receive application data packets. When the first CIM is sent, we set a flag to 1. This flag is put back to 0 as soon as we receive a CIM with \verb$reply = 0$. But if we receive an application data with the flag still on, we process the data and retransmit the last CIM. An example is presented on Figure \ref{fig:CIMexchange2}.
+We could point out the fact that the knowledge of the interfaces is only needed when the host is really using them (i.e. sending packets). Therefore, we could think of a mechanism which retransmits only when there is evidence that the other is still alive : when we receive application data packets. When the first CIM is sent, we set a flag to 1. This flag is put back to 0 as soon as we receive a CIM with \verb$reply = 0$. But if we receive an application data with the flag still on, we process the data and retransmit the last CIM. An example is presented on Figure \ref{fig:CIMexchange2}.
 
 \begin{figure}[!h]
 \centering
@@ -130,13 +129,13 @@ We could point out the fact that the knowledge of the interfaces is only needed 
 \declinst{client}{Client}{}
 \declinst{server}{Server}{}
 
-\lost[r]{ChangeInterfaceMessage[2, client1, client2, reply=1]}[t]{}{client}[7]
+\lost[r]{ChangeInterfaceMessage[reply=1, 2, client1, client2]}[t]{}{client}[7]
 \nextlevel
 \mess{ApplicationData}[t]{server}[0.3]{client}[1]
 \nextlevel
-\mess{ChangeInterfaceMessage[2, client1, client2, reply=1]}[t]{client}[0.25]{server}[1]
+\mess{ChangeInterfaceMessage[reply=1, 2, client1, client2]}[t]{client}[0.25]{server}[1]
 \nextlevel
-\mess{ChangeInterfaceMessage[1, server1, [reply=0]]}[b]{server}[1]{client}[1]
+\mess{ChangeInterfaceMessage[[reply=0], 1, server1]}[b]{server}[1]{client}[1]
 \nextlevel
 \nextlevel
 
@@ -145,21 +144,21 @@ We could point out the fact that the knowledge of the interfaces is only needed 
 \label{fig:CIMexchange2}
 \end{figure}
 
-Of course if some packets were already on the line before the server has received the CIM, we will retransmit multiple times the CIM and therefore waste bandwidth.
+Of course if some packets were already on the line before the server has received the CIM, we will retransmit many times the CIM and therefore waste bandwidth.
 
-Our solution is somehow a mix between the pure timeout and the direct retransmission after every packet. When we first send the \texttt{CIM}, we store a timestamp in a variable. For every packets received, we check if the time elapsed is enough and we retransmit the packet and reset the timestamp to the current time. The "enough" is customizable, we could set a default value of 2 RTT for \texttt{CIM} retransmission. The main benefit of checking only when we receive packets is that we don't waste bandwidth for dead links and we don't need for parallelization mechanism (e.g. interruptions).
+Our solution is somehow a mix between the pure timeout and the direct retransmission after every packet. When we first send the \texttt{CIM}, we store a timestamp in a variable. For every packets received, we check if the elapsed time is enough and we retransmit the packet and reset the timestamp to the current time. The "enough" is customizable, we could set a default value of 2 RTT for \texttt{CIM} retransmission. The main benefit of checking only when we receive packets is that we don't waste bandwidth for dead links and we don't need parallelization mechanism (e.g. interruptions).
 
 This strategy will be used for all retransmission of control packets with possibly different thresholds for the timers.
 
-\section{Secure sub-flows establishment}
+\section{Secure sub-flows setting up}
 
 In the first design of our protocol, we didn't use any handshake to attach new sub-flows to the global connection. Instead, we were creating all the possible sub-flows by combining the host and remote addresses, directly initializing the sockets in connected mode. However, this solution is not suitable in various situations, like NAT-traversals or short-living interfaces. 
 
 Other multipath protocols don't need to explicitly start a new flow. That's the case for MPRTP, the interfaces are just advertised and all possible combinations of 2 interfaces are then acceptable. But MPRTP doesn't have any security concerns as we do.
 
-Using not connected sockets could present a potential weak point for a DoS (Denial of Service) attack. Indeed if an attacker could guess IP addresses of the server, he can send garbage under the form of traditional DTLS packets. This could be computation costly since it forces the server to establish the packet authenticity and involves cryptographic operations. This cost is lighter if we use connected sockets as packets incoming from other addresses or ports than the connected ones are immediately dropped by the UDP stack. Also, this problem does not show up when the involved packets are not cryptographically signed, like the handshake packets. Thus, the solution presented in the Section \ref{sec:breakbeforemake} can overlook this issue as it is based on the shortened DTLS handshake.
+Using not connected sockets could present a potential weak point for a DoS (Denial of Service) attack. If an attacker could guess IP addresses of the server, she can send garbage under the form of traditional DTLS packets. This could get computation costly since it forces the server to establish the packet authenticity and involves cryptographic operations. This is cheaper if we use connected sockets because packets coming from other addresses or ports than the connected ones are immediately dropped by the UDP stack. Also, this problem does not appear when the involved packets are not cryptographically signed, like the handshake packets. The solution presented in the Section \ref{sec:breakbeforemake} allows to overlook this issue as it is based on the shortened DTLS handshake.
 
-To address this issue, we define three scenarios of sub-flow establishment and the solutions to cope with.
+To address this issue, we define three scenarios of sub-flow creation and the solutions to cope with.
 
 \subsection{Make-before-break sub-flows}
 
