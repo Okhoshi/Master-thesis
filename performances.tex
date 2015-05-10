@@ -1,0 +1,15 @@
+\chapter{Performances}\label{chap:perfs}
+
+\section{Overhead measurements}
+
+Experiment : we use a tool to generate traffic for a target bandwidth. we measure without the tunnel, the tool should display the target bandwidth. Then we run the tunnel and launch wireshark beside. We use the same tool with the same target bandwith. We measure the real bandwidth used with wireshark (with the DTLS overhead). We report the difference between the two runs. In this experiment, we use only one path.
+
+
+\section{Multipath repartition}
+
+Experiment : we have a network configuration with 2 paths between the client and the server. We use Wireshark to obtain graph about the repartition between the paths. To define : the characteristics of the paths, the scheduler to be used. 
+
+\section{Resiliency to interfaces removal}
+
+
+\section{Smoothness when we add a new interface}

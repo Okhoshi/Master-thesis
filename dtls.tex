@@ -55,7 +55,7 @@ From this point, we will consider ECDHE for key exchange and RSA for signatures.
 \begin{figure}[!h]
 \centering
 \includegraphics[width=\linewidth]{images/ECDHEhandshake}
-\caption{TLS handshake with ECDHE for key exchange (taken from \cite{tlsdhhandshake})}
+\caption[TLS handshake with ECDHE]{TLS handshake with ECDHE for key exchange (taken from \cite{tlsdhhandshake})}
 \label{fig:tls_handshake}
 \end{figure}
 
@@ -299,8 +299,29 @@ By the peer to peer nature of this application, a signalling server is needed to
 To sum up, all these applications may benefit from using DTLS but also MPDTLS as it will allow more resilience and better performances. We will demonstrate this point in the following chapters.
 
 \section{Security considerations}
+\label{sec:tls-sec}
 
-\todo[inline]{complete}
+Most of the security considerations are the same as those of TLS 1.2 \cite{RFC5246} since DTLS is only an adaptation of TLS for unreliable transport protocols.
+
+The attacks known for TLS could theoretically be used for DTLS as well. This is the case for the "secure renegotiation". As a reminder, this vulnerability allows an attacker who can hijack a HTTPS connection to add custom request to a communication between the client and the web server. Even if the attacker cannot retrieve the content of the communication, it can still have dramatic consequences. As depicted on Figure \ref{fig:tls-reneg} taken from \cite{tls-reneg}, an attacker can inject bank orders and then trigger the renegotiation with a real client. The bank order is only delayed and when the renegotiation is completed, it is executed before anything else. The best solution up to know is to disable by default this feature on servers. \todo{Or to implement the extension RFC5746}
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=0.8\textwidth]{images/TLSrenegotiation}
+\caption{TLS renegotiation vulnerability}
+\label{fig:tls-reneg}
+\end{figure}
+
+Other attacks could also be applied to DTLS and be more efficient on DTLS than on TLS, namely the DoS attacks. Two main categories can be identified :
+
+\begin{itemize}
+\item The blind DoS : packets are being transmitted with a spoofed IP address to redirect the traffic to another target (amplification attack) or to simply not diclose the IP address of the attacker. They are called blind because the attacker will never receive any answer from the server. They are made easier with UDP because no handshake is needed with the server.
+\item Computational DoS : the attacker can reply to certain messages but will try to optimize the ratio between the work he has to do and the work he is asking to the server.
+\end{itemize}
+
+Blind DoS are made impossible in TLS because the attacker must first complete the TCP handshake and thus prove he can answer at this address. As presented earlier, the introduction of the \texttt{Hello Verify Request} will prevent this kind of attack for DTLS too.  Although it is not a strict requirement to implement this feature in DTLS (\cite{rfc6347} Section 5), it is strongly recommended for DTLS servers  unless there is a good reason to think that no amplification is possible in their environment.
+
+Nevertheless the second type can still be used to disturb a server running DTLS or even TLS. As explained by E. Rescorla in \cite{tls-dos}, nothing is done at the design level to prevent these kind of attacks because it would imply putting a lot of work on the client side. It is generally a bad idea for performances. Moreover, the attackers are often using infected computers of casual people to launch DoS attacks. Therefore they have a lot of CPU power available anyway.
 
 \section{Heartbeat extension}
 
@@ -318,7 +339,7 @@ struct {
 } HeartbeatMessage;
 \end{lstlisting}
 
-For now, only two types of Heartbeat messages are in use : \texttt{HeartbeatRequest} and \texttt{HeartbeatResponse}. The response must contain the same payload as the one in the request triggering it. A simple exchange is presented on Figure \ref{fig:heartbeat}.
+For now, only two types of Heartbeat messages are in use : \texttt{Heartbeat Request} and \texttt{Heartbeat Response}. The response must contain the same payload as the one in the request triggering it. A simple exchange is presented on Figure \ref{fig:heartbeat}.
 
 \begin{figure}[!h]
 \centering

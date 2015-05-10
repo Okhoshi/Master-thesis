@@ -3,7 +3,7 @@
 \usepackage[T1]{fontenc}
 \usepackage{microtype}
 \usepackage[dvips]{graphicx}
-\usepackage{xcolor}
+\usepackage[usenames,dvipsnames]{xcolor}
 \usepackage{todonotes}
 \usepackage{times}
 \usepackage{amsmath}
@@ -12,8 +12,11 @@
 \usepackage{listings}
 \usepackage{pgf-umlsd}
 \usepackage{parskip}
+\usepackage{indentfirst}
+\usepackage[htt]{hyphenat}
 
 \setlength{\parskip}{10pt} %add space between paragraphs
+\setlength{\parindent}{0cm} % can remove all indentations
 
 %%% Fix the issue with \mess redefinition when importing msc
 \let\msg\mess
@@ -27,8 +30,10 @@
 
 \lstset{
   language = C,
-  basicstyle=\small,    % the size of the fonts that are used for the code
-  stepnumber=1,                           % the step between two line-numbers. If it is 1 each line will be numbered
+  basicstyle=\ttfamily\footnotesize,    % the size of the fonts that are used for the code
+  stepnumber=1, % the step between two line-numbers. If it is 1 each line will be numbered
+  commentstyle=\color{ForestGreen}, %color of comments
+  keywordstyle=\color{blue}\bfseries,
   numbersep=10pt,                         % how far the line-numbers are from the code
   tabsize=2,                              % tab size in blank spaces
   extendedchars=true,                     %
@@ -38,13 +43,18 @@
   stringstyle=\color{white}\ttfamily,
   showspaces=false,           
   showtabs=false,             
-  xleftmargin=17pt,
+  %xleftmargin=17pt,
   framexleftmargin=17pt,
   framexrightmargin=17pt,
-  framexbottommargin=5pt,
-  framextopmargin=5pt,
+  framexbottommargin=15pt,
+  framextopmargin=15pt,
   showstringspaces=false     
  }
+%%%%%%%%%%%TODO{On bloque les listings à se mettre sur une seule page ?}
+% \lstnewenvironment{code}[1][]%
+%   {\noindent\minipage{\linewidth}\medskip 
+%    \lstset{basicstyle=\ttfamily\footnotesize,#1}}
+%   {\endminipage}
 
 \renewcommand\lstlistlistingname{List of Listings}
 \newlistof{lstlistoflistings}{lol}{\lstlistlistingname}
@@ -178,18 +188,25 @@ June 2015
 %%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%
 
 \include{intro}
-\include{rpc}
-\fi
-
+\markboth{}{}
+\part{State of the Art}
+\include{mprtp}
 \include{dtls}
-
-\if0\draft
+\markboth{}{}
+\part{Multipath DTLS}
 \include{design}
 
+\fi
 \include{implem}
+
+\if0\draft
 \include{performances}
 \include{conclusion}
 \appendix
+
+\todo[inline]{Annexe sur l'app de tunneling + campagnol}
+\todo[inline]{Résumé de nos modifs  + wireshark}
+\todo[inline]{Summary of modifications (standard level), packets modified, new packets,...}
 
 \fi
 \bibliographystyle{unsrt}
