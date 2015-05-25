@@ -12,6 +12,7 @@
 \usepackage{listings}
 \usepackage{pgf-umlsd}
 \usepackage{parskip}
+\usepackage{gensymb}
 \usepackage{indentfirst}
 \usepackage[htt]{hyphenat}
 
@@ -22,7 +23,7 @@
 \let\msg\mess
 \let\mess\undefined
 
-\newcommand\draft{1}
+\newcommand\draft{0}
 
 \if1\draft
     \overfullrule=2cm
@@ -40,7 +41,6 @@
   breaklines=true,                        % sets automatic line breaking
   captionpos=b,                           % sets the caption-position to top
   mathescape=true,
-  stringstyle=\color{white}\ttfamily,
   showspaces=false,           
   showtabs=false,             
   %xleftmargin=17pt,
@@ -61,6 +61,10 @@
 \newcommand\typestyle{\rmfamily\mdseries\upshape}
 \newcommand\addtypes[1]{%
   \lstset{morekeywords=[3]{#1}}}
+\newlength{\textlarg}
+\newcommand{\barre}[1]{%
+   \settowidth{\textlarg}{#1}
+   #1\hspace{-\textlarg}\rule[0.5ex]{\textlarg}{0.5pt}}
 
 \usepackage[
 breaklinks=true,colorlinks=true,
@@ -187,30 +191,39 @@ June 2015
 %%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%
 %%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%
 
-\include{intro}
+\include{abstract} % Corrected
+\include{intro} %Corrected
+
 \markboth{}{}
 \part{State of the Art}
-\include{mprtp}
-\include{dtls}
+\include{dtls} % Corrected
+\include{mprtp} % Corrected
+
 \markboth{}{}
 \part{Multipath DTLS}
-\include{design}
-
+\include{design} % Corrected
 \fi
-\include{implem}
-
+\include{implem} % rereading
 \if0\draft
-\include{performances}
-\include{conclusion}
-\appendix
-
-\todo[inline]{Annexe sur l'app de tunneling + campagnol}
-\todo[inline]{Résumé de nos modifs  + wireshark}
-\todo[inline]{Summary of modifications (standard level), packets modified, new packets,...}
-
+\include{performances} % rereading
 \fi
+\include{conclusion} % writing
+
 \bibliographystyle{unsrt}
 \bibliography{articles,rfcs}
+
+\if0\draft
+
+\markboth{}{}
+\part*{Appendices}
+\addcontentsline{toc}{part}{Appendices}
+
+\appendix
+\include{appendices/campagnol} % Corrected
+\include{appendices/summary}
+
+
+\fi
 
 \end{document}
 

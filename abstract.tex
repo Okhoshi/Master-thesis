@@ -1,0 +1,13 @@
+\chapter*{Abstract\markboth{Abstract}{}}
+\addcontentsline{toc}{chapter}{Abstract}
+The goal of this master's thesis is to propose an extension for DTLS which is a protocol to communicate securely over an unreliable channel. Our extension, called Multipath DTLS, will give the opportunity for a DTLS session to use multiple interfaces concurrently.
+
+This feature becomes more useful with the emergence of devices that own 2 interfaces or more. Smartphones, tablets and even notebooks are all good candidates for multipath protocols. The ability to connect or disconnect interfaces on the fly and seamlessly for the application is now a dream coming true.
+
+Unlike other existing multipath protocols, the data security is a major objective and the design has been elaborated to keep the same security level as normal DTLS sessions. 
+
+This master thesis will review the current state of the art by presenting DTLS in detail but also MPRTP which is a Multipath extension for RTP. With some concepts borrowed from the latter, we will present our design for Multipath DTLS,  detailing all the modifications brought to the former protocol to support multiple interfaces at once. In addition, we had implemented our extension inside an existing DTLS library and were able to run some promising experiments. The last part is dedicated to the evaluation of this new extension. 
+
+To dispatch efficiently the packets among the available flows, different scheduling strategies were studied. With the extensive set of experiments in various network configurations, some recommendations emerged about what scheduler to use for a given context.
+
+This proposal might be used by a large amount of applications in very different contexts and on a substantial variety of devices.

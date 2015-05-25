@@ -1,0 +1,89 @@
+\chapter{Summary of the MPDTLS syntax}
+
+This section aims to do a summary of all the changes we made to the DTLS 1.2 RFC \cite{rfc6347}. All the added fields are explained in the Chapter \ref{chap:design}, the DTLS fields are explained in the RFC6347 and finally the TLS fields are detailed in the RFC5246 \cite{rfc5246}. For the sake of clarity, the TLS fields are the uncommented fields.
+
+\section{Record Layer}
+\addtypes{ExtensionType, byte, Extension, struct, ContentType, ProtocolVersion,uint16,uint48,select,opaque}
+\begin{lstlisting}
+struct {
+    ContentType type;
+    ProtocolVersion version;
+    uint16 epoch;                                               // DTLS field
+    uint48 sequence_number;                                     // DTLS field
+    uint16 length;
+    select (ContentType) {
+        case application_data: opaque fragment[DTLSPlaintext.length];
+        case change_interface: ChangeInterfaceMessageFragment;  // MPDTLS addition
+        case want_connect: WantConnectFragment                  // MPDTLS addition
+        case want_connect_ack: WantConnectAckFragment           // MPDTLS addition
+        case Feedback: FeedbackFragment                         // MPDTLS addition
+        case Feedback_ack: FeedbackAckFragment                  // MPDTLS addition
+    } fragment;
+} DTLSPlaintext;
+
+enum {
+    change_cipher_spec(20),
+    alert(21),
+    handshake(22),
+    application_data(23),
+    change_interface(TBD),                                      // MPTDLS addition
+    want_connect(TBD),                                          // MPTDLS addition
+    want_connect_ack(TBD),                                      // MPDTLS addition
+    feedback(TBD),                                              // MPTDLS addition
+    feedback_ack(TBD),                                          // MPDTLS addition
+    (255)
+} ContentType;
+
+
+struct {                                                        //
+    byte reply;                                                 //
+    if (reply) {                                                //
+        uint48 ack;                                             //
+    }                                                           //
+    byte number_addresses[2];                                   //
+    NewAddress addresses<1..2^16-1>;                            //
+} ChangeInterfaceMessageFragment;                               // MPDTLS addition
+
+struct {
+    NewAddress addr_src;                                        //
+    NewAddress addr_dst;                                        //
+    byte opts;                                                  //
+} WantConnectFragment;                                          // MPDTLS addition
+
+struct {                                                        //
+    uint48 ack_seq;                                             //
+    byte opts;                                                  //
+} WantConnectAckFragment;                                       // MPDTLS addition
+
+struct {                                                        //
+  uint64 received_packets_count;                                //
+  uint48 min_sequence_number;                                   //
+  uint48 max_sequence_number;                                   //
+  uint64 average_forward_delay;                                 //
+} FeedbackFragment;                                             // MPDTLS addition
+
+struct {                                                        //
+  uint32 feedback_sequence_number;                              //
+} FeedbackAckFragment;                                          // MPDTLS addition
+
+struct {                                                        //
+    byte address[16];                                           //
+    uint16 port;                                                //
+} NewAddress;                                                   // MPDTLS addition
+\end{lstlisting}
+
+\section{TLS Hello Extension}
+
+As shown in Section \ref{sec:helloext}, we use TLS Hello Extensions \cite{draft-tls13}(from Section 7.3.2.5) with a new \texttt{ExtensionType} to advertise the MPDTLS ability of a host.
+
+\begin{lstlisting} 
+struct {
+    ExtensionType extension_type;
+    byte          extension_length[2];
+    byte          extension_data[1];
+} Extension;
+
+enum {
+    mpdtls_extension(TBD), (65535)                              // MPDTLS addition
+} ExtensionType;
+\end{lstlisting}
