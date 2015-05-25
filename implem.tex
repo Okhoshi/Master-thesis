@@ -103,7 +103,7 @@ Internally, the \texttt{wolfSSL\_accept} and \texttt{wolfSSL\_connect} functions
 
 Once the \texttt{WOLFSSL} structure is correctly instantiated and the handshake has been successfully completed, we can start listening to the connection. This can be done by calling the \texttt{wolfSSL\_read( WOLFSSL*, void*, int)} function, whose internal flow inside the library is detailed in the Figure \ref{fig:readdiag}. Note that the mutex calls are not part of the original wolfSSL code, and are explained in Section \ref{sec:threadsafe}.
 
-When the function \texttt{wolfSSL\_read} is called, the process enters the library, dives into the \texttt{ReceiveData} and \texttt{ProcessReply} functions and will eventually make a blocking call into the \texttt{CBIORecv} macro\footnote{The low-level mechanisms to read and write on sockets are indeed encapsulated into macros selected following the compilation or configuration flags. This provides to the library some cross-platform aspects.} to listen on the socket. When a new packet arrives, the process is woke up and it copies the packet into an internal buffer. Once the copy is made and the pointers are correctly set, the process can treat the packet.
+When the function \texttt{wolfSSL\_read} is called, the process enters the library, dives into the \texttt{Receive Data} and \texttt{ProcessReply} functions and will eventually make a blocking call into the \texttt{CBIORecv} macro\footnote{The low-level mechanisms to read and write on sockets are indeed encapsulated into macros selected following the compilation or configuration flags. This provides to the library some cross-platform aspects.} to listen on the socket. When a new packet arrives, the process is woke up and it copies the packet into an internal buffer. Once the copy is made and the pointers are correctly set, the process can treat the packet.
 
 \begin{figure}[!hp]
 \centering
@@ -152,7 +152,7 @@ When the function \texttt{wolfSSL\_read} is called, the process enters the libra
 \end{figure}
 
 
-First, it reads the \texttt{RecordLayer} header, containing the length of the packet and the type of the Record. The latter can be one of the \texttt{ContentType} values defined in the RFC\cite{RFC5246}. During this verification, it also defines, based on the \texttt{ContentType} value, if the packet is encrypted and therefore needs to be deciphered before handling it.
+First, it reads the \texttt{RecordLayer} header, containing the length of the packet and the type of the Record. The latter can be one of the \texttt{ContentType} values defined in the RFC\cite{rfc5246}. During this verification, it also defines, based on the \texttt{ContentType} value, if the packet is encrypted and therefore needs to be deciphered before handling it.
 
 Then, after the decryption of the packet, it is dispatched to the handling function corresponding to the Record type. These functions are called following the pattern "\texttt{Do}\textit{TypeName}" (e.g. \textit{DoApplicationData} to handle AppData packets). For the sake of clarity, these two steps (decryption and all possible \texttt{Do}functions) are not represented in Figure \ref{fig:readdiag}.
 
@@ -169,7 +169,7 @@ Now that the library recognizes the new type and call the appropriate \texttt{Do
 
 The packets emission is even simpler, as we don't have to wait for some event, we trigger it. So, in wolfSSL, an application can send packets by the use of the \texttt{wolfSSL\_write(WOLFSSL*, void*, int)} function. As shown in the Figure \ref{fig:writediag}, the process then enters in \texttt{SendData}, which is responsible of all the authentication and encryption stuff, in the original code of the library. We moved the code handling the MAC and encryption in a new function \texttt{SendPacket}, allowing us to use the encryption not only for the Application Data packets but also for our protocol-level packets. As for the receiving functions, we created a set of \texttt{Send\textit{TypeName}} functions, in charge of building the corresponding packets before sending them. All these methods end by calling \texttt{SendPacket} which will then call \texttt{SendBuffered}. \texttt{SendBuffered} is the last function in the library before leaving the control to the concrete sending macro \texttt{CBIOSend}, and this is the place we choose to put our scheduling mechanism. The socket to use is thus chosen at the beginning of \texttt{SendBuffered}, just before the call to the sending function.
 
-\begin{figure}[!h]
+\begin{figure}[!ht]
 \centering
 \begin{sequencediagram}
 \centering
@@ -319,7 +319,7 @@ Once we have multiple flows, we need to listen to all of them. In the original i
 
 The sending part (Figure \ref{fig:writediag}) is even easier, as we just need to replace the socket used to send the current packet through \texttt{CBIOSend}. This replacement is made in \texttt{SendBuffered} to disturb as few as possible the library. As DTLS already used the field \texttt{ssl->buffers.dtlsCtx.fd} to indicate the socket descriptor to give to \texttt{sendto}, which is generally the function called by the \texttt{CBIOSend} macro on a Unix system. To determine the socket descriptor to put in the \texttt{dtlsCtx}, we have two ways: the path manager (explained in the subsection \ref{ssec:pathmanager}) or the preference setting.
 
-Sometimes, we need to specify explicitly the flow to use for a message, like for the \texttt{HeartbeatResponse}, which must go back on the same flow as the \texttt{HeartbeatRequest}. For this, we added a special option in the session object allowing us to specify a flow of preference. If this option is set, it has priority on the Path manager and the packets will be sent on this socket, without asking to the path manager which flow should be used.
+Sometimes, we need to specify explicitly the flow to use for a message, like for the \texttt{Heartbeat Response}, which must go back on the same flow as the \texttt{HeartbeatRequest}. For this, we added a special option in the session object allowing us to specify a flow of preference. If this option is set, it has priority on the Path manager and the packets will be sent on this socket, without asking to the path manager which flow should be used.
 
 \subsection{Path manager}\label{ssec:pathmanager}
 
@@ -372,7 +372,7 @@ When a second feedback arrives, everything below the minimum sequence number rep
 \label{fig:feedback-imp2}
 \end{figure}
 
-Note that in our example the sequence numbers are sequential. It is not a requirement since in practice packets will be sent on different paths and therefore some gaps may be present between sequence numbers on a particular path. Nevertheless will still need the sequence number to be strictly increasing over time for the max-min mechanism to work well. This is guaranteed by DTLS and even if we reach the maximum sequence number allowed, the handshake must first be repeated according to \cite{RFC5246}.
+Note that in our example the sequence numbers are sequential. It is not a requirement since in practice packets will be sent on different paths and therefore some gaps may be present between sequence numbers on a particular path. Nevertheless will still need the sequence number to be strictly increasing over time for the max-min mechanism to work well. This is guaranteed by DTLS and even if we reach the maximum sequence number allowed, the handshake must first be repeated according to \cite{rfc5246}.
 
 The loss rate is computed every time we received a feedback on the range [min,max] carried by this feedback. This will sometimes cause to compute the loss rate on overlapping sets of packets. This is the case with the scenario presented on figure \ref{fig:feedback-imp2}: we first compute the loss rate on the packets 1 to 4 and then a second time on the packets 1 to 7. As stated in the design part, the loss rate is only an estimation of the real loss rate. However in practice, our system estimates quite accurately the real loss rate (see Section \ref{sec:perfs-loss} for more details). In addition, as recommended in Section \ref{sec:design-loss-rate}, we use an exponential average to consider new loss rates. This prevents short term statistics to impact too heavily the global loss rate of the flow.
 

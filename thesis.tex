@@ -192,7 +192,7 @@ June 2015
 %%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%
 
 \include{abstract} % Corrected
-\include{intro} %Corrected
+\include{intro} % Corrected
 
 \markboth{}{}
 \part{State of the Art}
@@ -207,20 +207,20 @@ June 2015
 \if0\draft
 \include{performances} % rereading
 \fi
-\include{conclusion} % writing
-
+\include{conclusion} % rereading
+\include{acknowledgement}
 \bibliographystyle{unsrt}
 \bibliography{articles,rfcs}
 
 \if0\draft
-
+\clearpage
 \markboth{}{}
-\part*{Appendices}
 \addcontentsline{toc}{part}{Appendices}
+\part*{Appendices}
 
 \appendix
 \include{appendices/campagnol} % Corrected
-\include{appendices/summary}
+\include{appendices/summary} % Corrected
 
 
 \fi

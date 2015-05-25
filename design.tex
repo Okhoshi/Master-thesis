@@ -79,11 +79,11 @@ struct {
 } NewAddress;
 \end{lstlisting}
 
-The \texttt{CIM} contains all the addresses a host wants to share. We decided to always transmit all the addresses to provide redundancy. Also, to be sure we do not lose potential bandwidth, the \texttt{CIM}s are retransmitted in case of loss and so are acknowledged. To avoid wasting resources, we use the acknowledgement to transmit the list of addresses of the receiving host. This way, we are sure that each host knows the exact configuration of the other at any time (once the first host received the acknowledgement). This strategy has also been chosen for the retransmission in MPRTP \cite{singh-avtcore-mprtp}.\\
+The \texttt{CIM} contains all the addresses a host wants to share. We decided to always transmit all the addresses to provide redundancy. Also, to be sure we do not lose potential bandwidth, the \texttt{CIM}s are retransmitted in case of loss and so are acknowledged. To avoid wasting resources, we use the acknowledgement to transmit the list of addresses of the receiving host. This way, we are sure that each host knows the exact configuration of the other at any time (once the first host received the acknowledgement). This strategy has also been chosen for the retransmission in MPRTP \cite{singh-avtcore-mprtp}.
 
 An example of the \texttt{CIM} exchange is shown in the Figure \ref{fig:CIMexchange}. The message is structured as follows: the fact that it is an acknowledgement or not (reply bit), the total number of interfaces we are advertising and the list of interfaces (following format presented in Listing \ref{lst:cimformat}). For the sake of clarity, the DTLS informations (such as the epoch, version,\dots) are not represented on Figure \ref{fig:CIMexchange} and the sequence numbers are shown between chevrons.
 
-\begin{figure}[!h]
+\begin{figure}[!ht]
 \centering
 \begin{msc}[r]{MultiPath-DTLS Addresses announcement}
 
@@ -117,7 +117,7 @@ A CIM message must be retransmitted if the reply is not received because the pac
 
 We could point out the fact that the knowledge of the interfaces is only needed when the host is really using them (i.e. sending packets). Therefore, we could think of a mechanism which retransmits only when there is evidence that the other is still alive : when we receive application data packets. When the first CIM is sent, we set a flag to 1. This flag is put back to 0 as soon as we receive a CIM with \verb$reply = 0$. But if we receive an application data with the flag still on, we process the data and retransmit the last CIM. An example is presented on Figure \ref{fig:CIMexchange2}.
 
-\begin{figure}[!h]
+\begin{figure}[!ht]
 \centering
 \begin{msc}[r]{MultiPath-DTLS Addresses announcement RTX}
 
@@ -204,7 +204,7 @@ struct {
 Figure \ref{fig:Handshake1} presents how it will take place when a server has 2 interfaces and the client only one. First the traditional DTLS handshake is established between the client and the public interface of the server (S1). By a \texttt{CIM} exchange, the client is aware of the existence of a second interface (S2). He then sends a \texttt{wantConnect} request and if this message is correctly received, the server will set up his second interface to receive packets from the client. After this exchange, heartbeat messages will take place to assess the availability of the link. The frequency must be defined according to experimentation, at this point we recommend to send a heartbeat message at least every 5s. The implementation must use a back-off strategy to prevent waisting resources on a dead link. If for some reasons, the interface is not reachable from the client, then the server will find out it never receives any heartbeat response and will close the socket. Otherwise, a new sub-flow has been set up and both hosts can use it to communicate securely. 
 
 
-\begin{figure}[!h]
+\begin{figure}[!ht]
 \centering
 \begin{msc}[r]{MultiPath-DTLS handshake make-before-break}
 
@@ -297,7 +297,7 @@ Unfortunately, the solution presented in the previous section is not applicable 
 
 Note this is only possible because Client1 and Client2 are the same machine and therefore share the session ID given by the server. The handshake is faster if the session is still on the server's cache because no certificate exchange is needed and the master key is the same as before.
 
-This solution presents the same security properties than the standard Session Resumption proposed in the \texttt{RFC5246}\cite{RFC5246}, Section 7.4.1.2. The RFC doesn't explicitly limit the session resumption to come from the same IP/port as before but it appears that some implementation do it. It was the case for Firefox and was criticized as a bug by N. Modadugu who is the co-author of DTLS\footnote{\url{https://bugzilla.mozilla.org/show_bug.cgi?id=415196}}. It can't be considered as a weakness since even if an attacker can steal the session ID, he doesn't know the master key and therefore won't be able to generate a correct \texttt{ChangeCipherSpec}.
+This solution presents the same security properties than the standard Session Resumption proposed in the \texttt{RFC5246}\cite{rfc5246}, Section 7.4.1.2. The RFC doesn't explicitly limit the session resumption to come from the same IP/port as before but it appears that some implementation do it. It was the case for Firefox and was criticized as a bug by N. Modadugu who is the co-author of DTLS\footnote{\url{https://bugzilla.mozilla.org/show_bug.cgi?id=415196}}. It can't be considered as a weakness since even if an attacker can steal the session ID, he doesn't know the master key and therefore won't be able to generate a correct \texttt{ChangeCipherSpec}.
 
 If the server clears the session cache in the meantime, the full DTLS handshake will take place and the server and the session will start without any other known remote interface. This is another reason to impose a \texttt{CIM} emission as soon as the sub-flow is up.
 
@@ -341,8 +341,8 @@ However, Fei Song et Al. propose in \cite{song2009estimator} a practical solutio
 
 Once we know how to estimate the forward delay of each subflow, or at least how to rank them on this criteria, we can easily create a mechanism to compute this estimation, it is illustrated in the Figure \ref{fig:forwardDelayComputation}. To avoid overhead on each DTLS AppData packets, we took the decision to use new dedicated packets to compute the forward delay. Each host will periodically send probe packet containing the current timestamp. When the other host receives it, it can compute the transmission delay modulo $\Delta T$. For the sake of simplicity, only the average of the delay computed will be transmitted in the \texttt{feedback} report, as presented in Section \ref{sec:feedbackReport}. The $\Delta T$ is considered constant over time because the clocks are increasing in the same way on all the hosts. As $\Delta T$ is constant, it does not introduce deviation in the calculation of the transmission delay average. 
 
-\begin{figure}[!h]
-\begin{minipage}[c]{.55\linewidth}
+\begin{figure}[!ht]
+\begin{minipage}[c]{.54\linewidth}
 \begin{msc}[r]{Forward Delay estimation}
 
 \setlength{\instfootheight}{0em}
@@ -372,14 +372,17 @@ Once we know how to estimate the forward delay of each subflow, or at least how 
 \label{fig:forwardDelayComputation}
 \end{minipage}
 \begin{minipage}[c]{.44\linewidth}
-To compute the forward delay, we propose to proceed as follow:\\
+To compute the forward delay, we propose to proceed as follow:
 
-The host (\textit{Server} in the Figure \ref{fig:forwardDelayComputation}) sends periodically \texttt{Probe} packets containing its current timestamp ($T_x$).\\
+The host (\textit{Server} in the Figure \ref{fig:forwardDelayComputation}) sends periodically \texttt{Probe} packets containing its current timestamp ($T_x$).
 
 Once received by the other host (Client$_{\{1,2\}}$), the latter can compute the transmission delay of this particular packet,
-$$FD_1 = T_1 - T_2' + \Delta{}T$$
-$$FD_2 = T_3 - T_4' + \Delta{}T$$
-and update its estimation $EFD$ using EWMA\footnote{\textbf{E}xponentially \textbf{W}eighted \textbf{M}oving \textbf{A}verage}:
+\begin{align*}
+FD_1 = T_1 - T_2' + \Delta{}T\\
+FD_2 = T_3 - T_4' + \Delta{}T
+\end{align*}
+
+and update its estimation using EWMA\footnote{\textbf{E}xponentially \textbf{W}eighted \textbf{M}oving \textbf{A}verage}:
 $$EFD_{i} = EFD_{i-1}*\alpha + FD_i*(1-\alpha) [+ \Delta T]$$
 with $\alpha = 0,875$ (Jacobson's algorithm).
 \end{minipage}
@@ -421,7 +424,7 @@ If one interface goes offline and at least one other link is still available, a 
 Figure \ref{fig:feedback} presents an example where feedback takes place once the communication is well established. After a reasonable number of packets is received (2 in the example), we trigger the emission of a \texttt{Feedback} . Sequence numbers are put beside each message.
 
 
-\begin{figure}[!h]
+\begin{figure}[!ht]
 \centering
 \begin{msc}[r]{MultiPath-DTLS Feedback}
 
@@ -449,7 +452,7 @@ Figure \ref{fig:feedback} presents an example where feedback takes place once th
 \label{fig:feedback}
 \end{figure}
 
-The structure of \texttt{feedbackMessage} is presented in Listing \ref{lst:feedbackM}. In the example, \texttt{Feedback(2,1,3)} means that we have received 2 packets since the last acknowledged feedback. The minimum and maximum sequence numbers received are 1 and 3 respectively. The client replies with a \texttt{feedbackAckMessage} carrying the sequence number of the corresponding \texttt{feedbackMessage}.
+The structure of \texttt{feedbackMessage} is presented in Listing \ref{lst:feedbackM}. In the example, \texttt{Feedback(2,1,3)} means that we have received 2 packets since the last acknowledged feedback. The minimum and maximum sequence numbers received are 1 and 3 respectively. The client replies with a \texttt{feedbackAck Message} carrying the sequence number of the corresponding \texttt{feedbackMessage}.
 
 The size of the sequence number is directly taken from the \texttt{RFC6347}\cite{rfc6347} while we consider 8 bytes enough to count the packets. The threshold which triggers the transmission of a feedback must be fixed way before this limit to provide useful information even at Gigabit speed. But in case some feedback or feedbackAck is lost, we must handle more than usual values. Indeed, as long as no acknowledgement has been received, the receiver will continue to send incremental feedback (i.e. the new feedback contains information about packets already reported in old feedback but not acknowledged).
 

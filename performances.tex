@@ -121,7 +121,7 @@ The first thing to evaluate is if we really take advantage of multiple interface
 In this experiment, we have tested the two schedulers that are taking the context into consideration : \texttt{Optimize Latency} and \texttt{Optimize Loss}. The configuration used is the following (the path numbers are referring to Figure \ref{fig:topo-log}) :
 
 
-\begin{table}[!h]
+\begin{table}[!ht]
 \centering
 \begin{tabular}{|c|c|c|c|}
 \hline
@@ -135,7 +135,7 @@ Path n\degree & bandwidth & loss rate & delay  \\ \hline
 The goal is to modulate the bandwidth of B and see how its usage rate is impacted. We have generated constant traffic with D-ITG \cite{ditg} using both UDP and TCP. All these results are reported in Figure \ref{fig:dynbw}. The measures have been obtained during sessions of 60 seconds and every experiment has been repeated 11 times to evaluate the mean. The 95\% confidence interval of the mean is presented in white and has been computed with a Student T distribution.
 
 
-\begin{figure}[!h]
+\begin{figure}[!ht]
 \centering
 \includegraphics[width=\textwidth]{images/xp/graph1.eps}
 \caption{Usage repartition with bandwidth variation}
@@ -153,7 +153,7 @@ Secondly, we observe a strange phenomenon if we look at the graph "UDP with sche
 
 This time, we want to see how the schedulers will react if we progressively increase the loss rate of one of the path. The configuration is the following :
 
-\begin{table}[!h]
+\begin{table}[!ht]
 \centering
 \begin{tabular}{|c|c|c|c|}
 \hline
@@ -167,7 +167,7 @@ Path n\degree & bandwidth & loss rate & delay  \\ \hline
 Again we are using 2 paths only and they have the same latency but different bandwidth. We increase the loss rate of path 2 from 0\% to 3\% gradually. The results we have obtained are presented on Figure \ref{fig:dynloss}.
 
 
-\begin{figure}[!h]
+\begin{figure}[!ht]
 \centering
 \includegraphics[width=\textwidth]{images/xp/graph2.eps}
 \caption{Usage repartition with loss rate variation}
@@ -210,7 +210,7 @@ When we loose the interface of path 1, the distribution is recomputed and most o
 
 
 
-\begin{figure}[!t]
+\begin{figure}[!ht]
 \centering
 \begin{minipage}{0.4\linewidth}
 \includegraphics[width=\textwidth]{images/xp/intlost_delay.eps}

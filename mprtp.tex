@@ -50,7 +50,7 @@ To do so, it carries Sender and Receiver reports. These reports are transmitted 
 
 \section{MPRTP}
 
-\begin{figure}[!h]
+\begin{figure}[!ht]
 
 \begin{minipage}[c]{0.55\linewidth}
 
@@ -128,7 +128,7 @@ As stated in the working draft, all the interfaces in use must be transmitted. M
 
 The scheduler is one of the most important aspect and a critical point if the multipath approach has to overcome the single path one. In the case of MPRTP, the sender must choose on which path to send the packets in order to guarantee a constant bit rate. A simple example with two paths is shown on Figure \ref{fig:mprtp-scheduler}.
 
-\begin{figure}[!h]
+\begin{figure}[!ht]
 \centering
 \includegraphics[width=0.9\textwidth]{images/mprtp-scheduler}
 \caption{MPRTP Sender's Scheduler}
@@ -139,7 +139,7 @@ The goal of the scheduler is to compute the fractional distribution to distribut
 
 However, the packets may arrive out-of-order if a significant difference in terms of RTT is noticed between paths. To compensate this reordering, a dejitter buffer must be set up at the receiver's side (Figure \ref{fig:mprtp-dejitter}). The buffer must be large enough to compensate variation in per-path RTT.
 
-\begin{figure}[!h]
+\begin{figure}[!ht]
 \centering
 \includegraphics[width=0.9\textwidth]{images/mprtp-dejitter}
 \caption{MPRTP buffer at receiver's side}
