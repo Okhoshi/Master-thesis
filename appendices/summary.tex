@@ -1,4 +1,5 @@
 \chapter{Summary of the MPDTLS syntax}
+\label{app:mpdtls-summary}
 
 This section aims to do a summary of all the changes we made to the DTLS 1.2 RFC \cite{rfc6347}. All the added fields are explained in the Chapter \ref{chap:design}, the DTLS fields are explained in the RFC6347 and finally the TLS fields are detailed in the RFC5246 \cite{rfc5246}. For the sake of clarity, the TLS fields are the uncommented fields.
 
@@ -40,8 +41,8 @@ struct {                                                        //
     if (reply) {                                                //
         uint48 ack;                                             //
     }                                                           //
-    byte number_addresses[2];                                   //
-    NewAddress addresses<1..2^16-1>;                            //
+    byte number_addresses;                                      //
+    NewAddress addresses<1..2^8-1>;                             //
 } ChangeInterfaceMessageFragment;                               // MPDTLS addition
 
 struct {

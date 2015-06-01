@@ -2,38 +2,38 @@
 
 \section{General conclusion}
 
-In this master thesis, we have introduced a new protocol called Multipath DTLS. First we have reviewed the current version of DTLS together with the principles it inherits from TLS. In addition, we have presented the different type of messages involved in a communication as well as a typical handshake. This was important to understand how we could integrate a new extension in this existing design.
+In this master thesis, we have introduced a new protocol called Multipath DTLS. First we reviewed the current version of DTLS together with the principles it inherits from TLS. In addition, we presented the different messages involved in a communication as well as a typical handshake. This was important to understand how we could integrate a new extension in this existing design.
 
-Secondly, we have presented an overview of MPRTP which is an existing multipath protocol. In this chapter, we have disclosed the essential components that allow the use of multiple interfaces concurrently. Since RTP uses most of the time UDP as transport protocol, we were able to integrate and adapt these principles into our design.
+Secondly, we have presented an overview of MPRTP which is an existing multipath protocol. In this chapter, we disclosed the essential components that allow the use of multiple interfaces concurrently. Since RTP uses most of the time UDP as its transport protocol, we were able to integrate and adapt these principles into MPDTLS.
 
-Chapter \ref{chap:design} describes our design for MPDTLS together with the new messages introduced. We had to solve multiple challenges:
+Chapter \ref{chap:design} describes our design together with the new messages introduced. We had to solve multiple challenges:
 
 \begin{enumerate}
-\item Securely exchange available interfaces between hosts
+\item Securely exchange available addresses between hosts
 \item Introduce a way to evaluate the quality of a particular path
 \item Design a light handshake to establish new flows.
 \end{enumerate}
 
-The first point was achieved with the help of a new message called the \texttt{ChangeInterfaceMessage} which carries all available IP addresses and ports of one host. This message is encrypted and authenticated as a normal Application Data.
+The first point is achieved with the help of a new message called the \texttt{ChangeInterfaceMessage} which carries all available IP addresses and ports of one host.
 
-The second point was handled with the addition of a feedback mechanism. This gives to the sender various information about the link such as the forward delay or the loss rate perceived. The scheduler may later use this information to choose the amount of traffic he wants to send on each flow.
+The second point is handled with the addition of a feedback mechanism. This gives to the sender various information about the link such as the forward delay or the loss rate perceived. The scheduler may later use this information to choose the volume of traffic it wants to send on each flow.
 
-Finally we took care of the last point by introducing new messages. Namely \texttt{WantConnect} and \texttt{WantConnectAck} that serve to establish a new flow if we have at least one other flow alive. They are both secured using the keys negotiated during the handshake.
+Finally we dealed with the last point by introducing new messages. Namely \texttt{WantConnect} and \texttt{WantConnectAck} that serve to establish a new flow if there is at least one other flow alive. All these messages have been secured as normal \texttt{Application Data} with the keys negotiated during the handshake.
 
-In chapter \ref{chap:implementation}, some details about the concrete implementation of this protocol were given. We decided to go with wolfSSL library and we have presented how the calls are handled internally. We have also reviewed our choices of structures to handle the different mechanisms needed for MPDTLS.
+Chapter \ref{chap:implementation} gave some details about the concrete implementation of this protocol. We have decided to work with wolfSSL library and we presented how the calls are handled internally. We have also reviewed our choices of structures to handle the different mechanisms needed for MPDTLS.
 
-In the latest chapter, we have evaluated our solution by building a simple VPN application which uses our modified library. We then measured the distribution of traffic between the different available paths with 2 different schedulers in various environments. We have shown that our implementation can take advantage of multiple interfaces and support more bandwidth that what would be available with only one link. Moreover, the connection is not troubled much if we lost or add an interface in the middle of the communication.
+In the last chapter, we have evaluated our solution by building a simple VPN application which uses our modified library. We then measured the distribution of traffic between the different available paths with 2 different schedulers in various environments. We have shown that our implementation can take advantage of multiple interfaces and support more bandwidth that what would be available with only one link. Moreover, the connection is not much troubled if we loose or add an interface in the middle of the communication.
 
 In conclusion, the initial goal of our extension (i.e. providing resiliency, mobility and better performances to DTLS when multiple interfaces are available) is fully achieved.
 
 
 \section{Future work}
 
-Our implementation of MPDTLS, although functional, may not be the most flexible. Indeed, we have perceived some limitations when we tried to integrate it with an existing application (see Appendix \ref{app:campagnol}). A future work would be to decouple the pure standard aspect such as sending or receiving MPDTLS packets from the I/O. To be more flexible we need to give the control back to the application when we want to open a new socket. This would require some engineering because we used the sockets to reserve some port numbers in advance and communicate them to the other host. A good compromise would be to stay with an internal system but make it easily replaceable by the application as we do for the scheduler. This has the advantage to bring no additional setup for a simple application but gives a way for applications with more complex needs to customize it.
+Our implementation of MPDTLS is functional, but could be more flexible. We have noticed some limitations when we were trying to integrate it with an existing application (see Appendix \ref{app:campagnol}). A future work would be to decouple the pure standard aspect such as sending or receiving MPDTLS packets from the I/O. To be more flexible we need to give the control back to the application when we want to open a new socket. This would require some engineering because we used the sockets to reserve some port numbers in advance and communicate them to the other host. A good compromise would be to stay with our existing system but making it easily replaceable by the application as we did for the scheduler. This has the advantage to bring no additional setup for a simple application but gives a way for applications with more complex requirements to customize I/O as they wish.
 
-As we have seen in Chapter \ref{chap:perfs}, we have used 2 schedulers that behave better in different situations. We could investigate a way to merge these two into a unique scheduler. It will compute the fractional distribution on both criteria : loss rate and forward delay. We can imagine such a scheduler will give priority to the loss rate is there is a big difference between the flows; and will go for the faster link if the loss rates are equivalent. This would need much more experiments and thinking to design this scheduler but it seems to be a good idea for the future.
+As we have seen in Chapter \ref{chap:perfs}, we are using 2 different scheduling policies that have their best behaviour in different situations. We could investigate a way to merge them into a unique scheduler. It will compute the fractional distribution on both criteria : loss rate and forward delay. We can imagine such a scheduler giving priority to the loss rate in case of big difference between the subflows; and choosing the fastest link if the loss rates are equivalent. It would need much more experiments and efforts to design this scheduler but it seems to be an interesting thought for future works.
 
-Another point we have put aside during the development is the NAT traversal feature. Such a functionality would be needed to use the VPN application at home. We have to investigate how to integrate STUN \cite{RFC5389} correctly and securely to obtain IP addresses and ports of NATed interfaces. This would also imply adding more information in the data structures inside the library because for each flow we will have to remember the public IP and the local IP on which the socket has been created.
+Another point we have put aside during the development is the NAT traversal feature. Such a functionality would be needed to use the VPN application at home. We have to investigate how to integrate STUN \cite{RFC5389} correctly and securely to obtain IP addresses and ports of NATed interfaces. This would also imply adding more information in the data structures inside the library because the public IP and the local IP of the created socket have to be stored for each subflow.
 
 A last point to discuss would be whether or not we should allow for DNS name inside our \texttt{Change InterfaceMessage} as MPRTP does (see Section \ref{sec:mprtp-advertise}). The security of DNS resolution could be guaranteed with DNSSEC \cite{RFC6840} and the usage of this protocol would therefore become a necessity. The support for DNS could bring substantial advantages because one DNS name can reference multiple IP addresses. In particular, one DNS name may have both A and AAAA fields and therefore the application will retrieve the corresponding IPv4 and IPv6 addresses to create two separate flows.
 

@@ -8,19 +8,21 @@ Since we designed MPDTLS as an extension for DTLS, it was logical not to impleme
 
 The choice was driven by the following criteria :
 \begin{itemize}
-\item Code readability
-\item Documentation
-\item Existing examples
-\item Library size
+\item the code readability
+\item the documentation
+\item existing examples
+\item the library size
 \end{itemize}
 
-Unlike OpenSSL, wolfSSL contains a small number of files to handle SSL/TLS and DTLS. The objective of this library is to be as light as possible to allow integration in embedded systems. As stated in their official website \cite{wolfssl}, the library is up to 20 times smaller than OpenSSL. Documentation and working examples are provided to help its use.
+Unlike OpenSSL, wolfSSL contains a small number of files to handle SSL/TLS and DTLS. The objective of this library is to be as light as possible to allow its integration in embedded systems. As stated on its official website \cite{wolfssl}, the library is up to 20 times smaller than OpenSSL \cite{openssl}. Documentation and working examples are provided to help its use.
+
+For information purpose, a summary of all the modifications made inside wolfSSL is presented in Appendix \ref{app:modifs}. In addition, we have modified the DTLS dissector of Wireshark\cite{wireshark} to recognize our new packets and debug more easily (see Appendix \ref{app:wireshark}).
 
 \section{Library calls}
 
 In this section, we show how to use wolfSSL, how to set up the library and create a DTLS session and how to transform an existing DTLS code to use MPDTLS instead. Then we dive deep into the library code to see how the handshake is done internally and how the packets are sent and received.
 
-It is important to recall wolfSSL is a library and thus does not have any existence outside the calls made and the structure stored in variables in the client code.
+It is important to remind wolfSSL is a library and thus does not have any existence outside the calls made and the structure stored in variables in the client code.
 
 \subsection{wolfSSL Context initialization}
 
@@ -34,17 +36,16 @@ First, the context structure must be initialized. WolfSSL provides a function to
     WOLFSSL_CTX *ctx;
     WOLFSSL_METHOD* method = wolfDTLSv1_2_client_method();
     if ( (ctx = wolfSSL_CTX_new(method)) == NULL){
-        fprintf(stderr, "wolfSSL_CTX_new error.\n");
-        exit(EXIT_FAILURE);
+        // error handling
     }
 \end{lstlisting}
 
 Once the \texttt{ctx} \textit{object} is created, we can call various functions to set up some parameters, like:
 \begin{itemize}
-\item the addresses advertised by the host
-\item the ciphers that the host can use to exchange the security parameters during the handshake and to protect the conversation later
-\item the certificate and corresponding private key to authenticate the host (this is optional for the client)
-\item the Certification Authority certificate that allows the host to check the validity and integrity of the received certificates
+\item the addresses advertised by the host,
+\item the cipher suites that the host can use to exchange the security parameters during the handshake and to protect the conversation later,
+\item the certificate and corresponding private key to authenticate the host (this is optional for the client),
+\item the Certification Authority certificate that allows the host to check the validity and integrity of the received certificates.
 \end{itemize}
 
 Other parameters can be set and they are all well explained in the wolfSSL documentation\cite{wolfssl.doc}.
@@ -53,24 +54,24 @@ Other parameters can be set and they are all well explained in the wolfSSL docum
 
 \subsubsection{Client side}
 
-Once again, wolfSSL provides a simple function to create sessions, \texttt{wolfSSL\_new}, which takes a context in argument. We can provide it the context we just created to initiate a session with the parameters set up in the context. If we want to enable Multipath DTLS, we have added a simple function, \texttt{wolfSSL\_UseMultiPathDTLS}, to enable or disable it.
+Once again, wolfSSL provides a simple function to create sessions, \texttt{wolfSSL\_new}, which takes a context in argument. In this way, the session is initiated with the parameters set up in the context previously created. To turn on Multipath DTLS, we have added a simple function, \texttt{wolfSSL\_UseMultiPathDTLS}, to enable or disable it.
 
-The next step is first to provide the library a freshly created socket. It does not have to be connected at this point. Second, we need to set the server address through the \texttt{wolfSSL\_dtls\_set\_peer} call.
+The next step is first to provide the library with a freshly created socket. It does not have to be connected at this point. Secondly, we need to set the server address through the \texttt{wolfSSL\_dtls\_set\_peer} call.
 
 \begin{lstlisting}
     wolfSSL_set_fd(ssl, *sockfd);
     
     if(wolfSSL_dtls_set_peer(ssl, serv_addr, sz)!=SSL_SUCCESS){
-        perror("Error while trying to define the peer for the connection");
+        //error handling
     }
 \end{lstlisting}
 
-In case of session resumption, the session can be restored with the \texttt{wolfSSL\_set\_session}. The session will be automatically resumed if it was still present in the server session cache. If the session has been wiped out from the cache, the library will ignore this call. The \texttt{WOLFSSL\_SESSION} object can be retrieved from an established DTLS session by using the \texttt{wolfSSL\_get\_session} call.
+In case of session resumption, the session can be restored with the \texttt{wolfSSL\_set\_session}. The session will be automatically resumed if it is still present in the server session cache. If the session has been wiped out from the cache, the library will ignore this call. The \texttt{WOLFSSL\_SESSION} object can be retrieved from an established DTLS session by using the \texttt{wolfSSL\_get\_session} call.
 
 \begin{lstlisting}
     if(sess != NULL) {
         if(wolfSSL_set_session(ssl, sess)!=SSL_SUCCESS) {
-            perror("SSL_set_session failed");
+            //error handling
         }
     }
 \end{lstlisting}
@@ -79,31 +80,28 @@ Finally, we can connect the DTLS client to the server. If the \texttt{wolfSSL\_c
 
 \begin{lstlisting}
     if (wolfSSL_connect(ssl) != SSL_SUCCESS) {
-        int  err = wolfSSL_get_error(ssl, 0);
-        char buffer[1000];
-        printf("err = %d, %s\n", err, wolfSSL_ERR_error_string(err, buffer));
-        perror("SSL_connect failed");
+        //error handling
     }
 \end{lstlisting}
 
 
 \subsubsection{Server side}
 
-From the server point of view, the session creation is almost the same as the one client-side. The first difference is that the server must listen on an unconnected socket (like every server) and create the session only once a message have been received on this socket.
+From the server point of view, the session creation is almost the same. The first difference is that the server must listen an unconnected socket (like every server) and create the session only once a message have been received on this socket.
 
 The other difference is that the server does not have to call \texttt{wolfSSL\_dtls\_set\_peer}, but it has to use \texttt{wolfSSL\_set\_fd} with a connected socket (from its own address and port towards the sender of the triggering packet). Finally, the server calls \texttt{wolfSSL\_accept} instead of \texttt{wolfSSL\_connect} to start the handshake.
 
 \subsection{Handshake}
 
-The handshake that is executed on \texttt{wolfSSL\_accept} and \texttt{wolfSSL\_connect} is the standard handshake defined in the RFC6347\cite{rfc6347} and depicted on Figure \ref{fig:dtls-handshake}. As the handshake consists of several messages sent back and forth between the client and the server, the work-flow behind this handshake relies heavily on the packet reception and emission processes. These processes are detailed in the Sections \ref{sec:packet-reception} and \ref{sec:packet-emission} respectively.
+The handshake that is executed on \texttt{wolfSSL\_accept} and \texttt{wolfSSL\_connect} is the standard handshake defined in the RFC6347\cite{rfc6347} and illustrated on Figure \ref{fig:dtls-handshake}. As the handshake consists of several messages sent back and forth between the client and the server, the work-flow behind this handshake heavily relies on the packet reception and emission processes. These processes are detailed in the Sections \ref{sec:packet-reception} and \ref{sec:packet-emission} respectively.
 
-Internally, the \texttt{wolfSSL\_accept} and \texttt{wolfSSL\_connect} functions are built in the same way, the sole difference being the waited and sent messages. A variable is initialized at the beginning of each function, and changed upon reception of each message. This variable contains the state of the handshake, and so the messages that should be read or sent. If an unexpected message is received at some point, two behaviors can occur, depending of the received message nature. Either the message is kept in a buffer for later use, if it presents evidence of reordering, or the handshake is aborted and the function returns with the corresponding error code. This error code informs the application about what gone wrong. Otherwise, the function returns only once the handshake is successfully completed.
+Internally, the \texttt{wolfSSL\_accept} and \texttt{wolfSSL\_connect} functions are built in the same way, the sole difference being the expected and sent packets. A variable is initialized at the beginning of each function, and modified on reception of each message. This variable contains the state of the handshake, and so determines the messages that should be read or sent. If an unexpected one is received at any point, two behaviors can occur, depending of its nature. Either it is kept in a buffer for later use, if it presents evidence of reordering, or the handshake is aborted and the function returns with the corresponding error code. This error code informs the application about what gone wrong. Otherwise, the function returns only once the handshake is successfully completed.
 
 \subsection{Packet reception}\label{sec:packet-reception}
 
-Once the \texttt{WOLFSSL} structure is correctly instantiated and the handshake has been successfully completed, we can start listening to the connection. This can be done by calling the \texttt{wolfSSL\_read( WOLFSSL*, void*, int)} function, whose internal flow inside the library is detailed in the Figure \ref{fig:readdiag}. Note that the mutex calls are not part of the original wolfSSL code, and are explained in Section \ref{sec:threadsafe}.
+As soon as the \texttt{WOLFSSL} structure is correctly instantiated and the handshake has been successfully completed, we can start listening to the connection. This can be done by calling the \texttt{wolfSSL\_read( WOLFSSL*, void*, int)} function, whose internal flow inside the library is detailed in the Figure \ref{fig:readdiag}. Note that the mutex calls are not part of the original wolfSSL code, and are explained in Section \ref{sec:threadsafe}.
 
-When the function \texttt{wolfSSL\_read} is called, the process enters the library, dives into the \texttt{Receive Data} and \texttt{ProcessReply} functions and will eventually make a blocking call into the \texttt{CBIORecv} macro\footnote{The low-level mechanisms to read and write on sockets are indeed encapsulated into macros selected following the compilation or configuration flags. This provides to the library some cross-platform aspects.} to listen on the socket. When a new packet arrives, the process is woke up and it copies the packet into an internal buffer. Once the copy is made and the pointers are correctly set, the process can treat the packet.
+When the function \texttt{wolfSSL\_read} is called, the process enters the library, dives into the \texttt{Receive Data} and \texttt{ProcessReply} functions and will eventually make a blocking call into the \texttt{CBIORecv} macro\footnote{The low-level mechanisms to read and write on sockets are indeed encapsulated into macros selected following the compilation or configuration flags. This provides to the library some cross-platform aspects.} to listen the socket. When a new packet arrives, the process is woken up and it copies the packet into an internal buffer. Once the copy is made and the pointers are correctly set, the process can treat the packet.
 
 \begin{figure}[!hp]
 \centering
@@ -152,22 +150,22 @@ When the function \texttt{wolfSSL\_read} is called, the process enters the libra
 \end{figure}
 
 
-First, it reads the \texttt{RecordLayer} header, containing the length of the packet and the type of the Record. The latter can be one of the \texttt{ContentType} values defined in the RFC\cite{rfc5246}. During this verification, it also defines, based on the \texttt{ContentType} value, if the packet is encrypted and therefore needs to be deciphered before handling it.
+First, it reads the \texttt{RecordLayer} header, containing the length of the packet and the record type. The latter is one of the \texttt{ContentType} values defined in the RFC\cite{rfc5246}. During this verification, it also defines, based on the \texttt{ContentType} value, if the packet is encrypted and therefore needs to be deciphered before being handled.
 
-Then, after the decryption of the packet, it is dispatched to the handling function corresponding to the Record type. These functions are called following the pattern "\texttt{Do}\textit{TypeName}" (e.g. \textit{DoApplicationData} to handle AppData packets). For the sake of clarity, these two steps (decryption and all possible \texttt{Do}functions) are not represented in Figure \ref{fig:readdiag}.
+Then, after the decryption of the packet, it is dispatched to the handling function corresponding to the \texttt{ContentType}. These functions are called following the pattern "\texttt{Do}\textit{TypeName}" (e.g. \textit{DoApplicationData} to handle application data packets). For the sake of clarity, these two steps (decryption and all possible \texttt{Do}functions) are not represented in Figure \ref{fig:readdiag}.
 
 
-In the original implementation of wolfSSL, the only Record type that could be encountered at this point was AppData. The function \textit{DoApplicationData} does some treatments on the packet like verifying the MAC or decompressing the packet if needed and finally copies the clear content of the packet into a buffer called \texttt{clearOutputBuffer}. Then, if the input buffer has been completely consumed, the process comes back to the function \texttt{ReceiveData}. This function copies the content of \texttt{clearOutputBuffer} to the application buffer passed in argument of \texttt{wolfSSL\_read}, giving to the client application the content of the received packet. The library will then exit and gives the control back to the calling code.
+In the original implementation of wolfSSL, the only Record type that could be encountered at this point was \texttt{Application Data}. The function \textit{DoApplicationData} applies some handlings on the packet like verifying the MAC or decompressing the packet if needed and finally copies the clear content of the packet into a buffer called \texttt{clearOutputBuffer}. Then, if the input buffer has been completely consumed, the process comes back to the function \texttt{ReceiveData}. This function copies the content of \texttt{clearOutputBuffer} to the application buffer passed in argument of \texttt{wolfSSL\_read}, thus giving to the client application the content of the received packet. The library then exits and gives the control back to the calling code.
 
 \subsubsection{Adding new types}
 
-Adding the recognition of a new type is done in two steps, after the defininion of all the needed declarations in the header file: we start by adding the type in the switch of the \texttt{GetRecordHeader} function. We can also add indication about the packet type, such as whether the content is ciphered or not. Then, we need to add a new case for the type in the switch statement of the \texttt{ProcessReply} function, in which we prepare and make the call to a new, dedicated function \texttt{Do\textit{TypeName}}.
+Adding the recognition of a new type needs two steps, after the definition of all the declarations needed in the header file: we start by adding the type in the switch of the \texttt{GetRecordHeader} function. We can also add indication about the packet type, such as whether the content is ciphered or not. Then, we need to add a new case for the type in the switch statement of the \texttt{ProcessReply} function, in which we make the call to a new, dedicated function \texttt{Do\textit{TypeName}}.
 
-Now that the library recognizes the new type and call the appropriate \texttt{Do}function, we can implement the latter with the intended behavior. In our case, we use the \texttt{DoApplicationData} as a base for the implementation of all the \textit{Do}function of protocol-level packet types (e.g. \texttt{Feedback}, \texttt{WantConnect}\dots). It is the easiest solution to get ciphering and authentication of the packets. But it is important to not let these packets leave the library and be delivered to the application. To achieve this, we move the pointer marking the end of the \texttt{clearOutputBuffer} before the beginning of the current packet, erasing in some way the packet we just treated.
+Now that the library recognizes the new type and calls the appropriate \texttt{Do}function, we can implement the latter with the intended behavior. In our case, we use the \texttt{DoApplicationData} as a base for the implementation of all the \texttt{Do}function of protocol-level packet types (e.g. \texttt{Feedback}, \texttt{WantConnect}\dots). It is the easiest solution to get ciphering and authentication of the packets. But it is important to prevent these packets from leaving the library and being delivered to the application. To achieve this, we move the pointer marking the end of the \texttt{clearOutputBuffer} before the beginning of the current packet, erasing in some way the packet we just have treated.
 
 \subsection{Packet emission}\label{sec:packet-emission}
 
-The packets emission is even simpler, as we don't have to wait for some event, we trigger it. So, in wolfSSL, an application can send packets by the use of the \texttt{wolfSSL\_write(WOLFSSL*, void*, int)} function. As shown in the Figure \ref{fig:writediag}, the process then enters in \texttt{SendData}, which is responsible of all the authentication and encryption stuff, in the original code of the library. We moved the code handling the MAC and encryption in a new function \texttt{SendPacket}, allowing us to use the encryption not only for the Application Data packets but also for our protocol-level packets. As for the receiving functions, we created a set of \texttt{Send\textit{TypeName}} functions, in charge of building the corresponding packets before sending them. All these methods end by calling \texttt{SendPacket} which will then call \texttt{SendBuffered}. \texttt{SendBuffered} is the last function in the library before leaving the control to the concrete sending macro \texttt{CBIOSend}, and this is the place we choose to put our scheduling mechanism. The socket to use is thus chosen at the beginning of \texttt{SendBuffered}, just before the call to the sending function.
+The packets emission is even simpler, as we do not have to wait for some event, we trigger it. So, in wolfSSL, an application can send packets using the \texttt{wolfSSL\_write(WOLFSSL*, void*, int)} function. As shown in the Figure \ref{fig:writediag}, the process then enters in \texttt{SendData}, which is responsible of all the authentication and encryption stuff, in the original code of the library. We moved the code handling the MAC and encryption in a new function \texttt{SendPacket}, allowing us to use the encryption not only for the Application Data packets but also for our protocol-level packets. As for the receiving functions, we created a set of \texttt{Send\textit{TypeName}} functions, in charge of building the corresponding packets before sending them. All these methods end with calling \texttt{SendPacket} which will then call \texttt{SendBuffered}. \texttt{SendBuffered} is the last function in the library before leaving the control to the concrete sending macro \texttt{CBIOSend}, and this is the place we choose to put our scheduling mechanism. The socket to use is chosen at the beginning of \texttt{SendBuffered}, just before the call to the sending macro.
 
 \begin{figure}[!ht]
 \centering
@@ -207,43 +205,43 @@ The packets emission is even simpler, as we don't have to wait for some event, w
 
 \section{Thread-safety}\label{sec:threadsafe}
 
-A major drawback of living at the application-level as a library is that you are really dependent of the application that uses you. For instance, all protocol-level packets need responses to ensure the reception since DTLS is not reliable. But, to trigger the internal mechanisms explained in the previous sections, the library must be in a listening state constantly. If an application needs to send some packets, which seems to be a normal use case of the library, it will need to use threads to read and write simultaneously. For this reason, we need to be sure that using the library in such way will not cause troubles, especially since the library uses a lot of internal buffers when it reads or writes. Because our treatments of protocol-level packets involve packets emission during packets reading, we considered the whole library code as a critical section, with a notable exception for the blocking call in the \texttt{Receive} function\footnote{As a call to \texttt{CBIORecv} is blocking, it prevents the application to write packets when the other thread waits for incoming packets, which would add an extra undesirable overhead.}.
+A major drawback of living at the application-level for a library is to be dependent on the application. For instance, all protocol-level packets need responses to ensure the reception since DTLS is not reliable. But, to trigger the internal mechanisms explained in the previous sections, the library must be in constantly a listening state. If an application needs to send some packets, which seems to be a normal use case of the library, it will need to use threads to read and write simultaneously. For this reason, we need to be sure that using the library in such a way will not cause troubles, especially since the library uses a lot of internal buffers when it reads or writes. Because our handlings of protocol-level packets involve packets emission during packets reading, we considered the whole library code as a critical section, with a notable exception for the blocking call in the \texttt{Receive} function\footnote{As a call to \texttt{CBIORecv} is blocking, it prevents the application to write packets when the other thread is waiting for incoming packets, which would add an extra undesirable overhead.}.
 
-Thus, as with every critical section that you want to protect, we added a mutex to lock when entering either \texttt{wolfSSL\_read} or \texttt{wolfSSL\_write} and to unlock just before leaving these functions. This mutex is also unlocked just before the blocking call to select and re-locked right after the select returns.
+Thus, as with every critical section to be protected, we added a mutex to lock when entering either \texttt{wolfSSL\_read} or \texttt{wolfSSL\_write} and to unlock just before leaving these functions. This mutex is also unlocked just before the blocking call to \texttt{select()} and re-locked right after this function returns.
 
-\subsection{What about processes ?}
+\subsection{Note about processes}
 
-Using processes instead of threads is another solution, but either processes have to use different session credentials or have to share memory to use the same session object. One could propose to simply duplicate the session either through the session resuming or via copy-on-write session mechanisms, but just having the same session credentials is not sufficient for the library to correctly work. As we use statistics to choose the best path to send new packets, the session object must be completely synchronized between the processes, with all the risks of memory corruption due to the simultaneous accesses. We finally end up in the same situation as with the threads.
+Using processes instead of threads is another solution, but processes have either to use different session credentials or to share memory to use the same session object. It is also possible to simply duplicate the session either through the session resuming or via copy-on-write session mechanisms, but just having the same session credentials is not sufficient for the library to work correctly. As we use statistics to choose the best path to send new packets, the session object must be completely synchronized between the processes, with all the risks of memory corruption due to the simultaneous accesses. We finally end up in the same situation as with the threads.
 
-For the sake of simplicity, we recommend thus to simply use threads, as we made our best to get a thread-safe library.
+For the sake of simplicity, we recommend to simply use threads, as we ensure the thread-safety of the library.
 
 \section{Managing timed (re)transmissions}
 
-As wolfSSL does not use interruption in its original version, we did not want to add this kind of control mechanism. And this is a problem as we have to handle timeouts and retransmissions for the control-level packets. Note that by timeout we mean either that the packet has not been acknowledged by the other host or that the packet must be sent periodically and the last sending occurred too long ago.
+WolfSSL does not use interruption in its original version and we did not want to add this kind of control mechanism. This is a problem as we have to handle timeouts and retransmissions for the control-level packets. Note that by timeout we mean either that the packet has not been acknowledged by the other host or that the packet must be sent periodically and the last sending occurred too long ago.
 
-We thus had to use other ways to detect that a packet needs retransmission. By checking actively after each packet sent, we can overcome the need of interruption mechanism. This check is implemented with the addition of the call to the \texttt{CheckTimeouts} function, just before the return of \texttt{SendBuffered}. This function verifies that neither \texttt{Heartbeat} message nor \texttt{CIM} needs (re)transmission. To know which packet needs to be retransmitted because it is in timeout state, we use two possible criteria. First, we base the timeout on the time elapsed since the last packet was sent. Second, we use as trigger the number of packets sent since the last packet of the considered type was sent.
+We thus had to use other ways to detect that a packet needs retransmission. By checking actively after each packet sent, we can do without the interruption mechanism. This check is implemented with the addition of the call to the \texttt{CheckTimeouts} function, just before the return of \texttt{SendBuffered}. This function verifies that neither \texttt{Heartbeat} message nor \texttt{CIM} need (re)transmission. To know which packet needs to be retransmitted because it is in timeout state, we use two possible criteria. First, we base the timeout on the time elapsed since the last packet was sent. Second, we use as trigger the number of packets sent since the last packet of the considered type was sent.
 
 \subsection{Timeouts}
 
-With this strategy, we are guaranteed to retransmit the packet within a delimited time window, given that other packets are sent since we check the timeouts only at this moment. The implementation of this part is quite simple as we just need to store the current time when we send the packet. The verification then consists in simply comparing the difference between the stored time value and the current time with a defined timeout offset.
+With the timeout strategy, we are guaranteed to retransmit the packet within a delimited time window, provided that other packets are sent as we check the timeouts only at this moment. The implementation of this part is quite easy, only asking to store the current time when we send the packet. The verification then consists in simply comparing the difference between the stored time value and the current time with a defined timeout offset.
 
-As the protocol does not give any guarantee about the delivery of \texttt{ApplicationData} packet but requires that \texttt{Heartbeat} and \texttt{CIM} are transmitted reliably, we use this strategy to ensure the retransmission. Also, the \texttt{Heartbeat} messages being sent periodically, this mechanism can also answer the need.
+The protocol does not give any guarantee about the delivery of \texttt{ApplicationData} packet but requires that \texttt{Heartbeat} and \texttt{CIM} are transmitted reliably, so we use this strategy to ensure the retransmission. The \texttt{Heartbeat} messages are sent periodically and this mechanism can also meet this requirement.
 
-Concerning our implementation, the timeval for the \texttt{CIM} is stored in the general structure of wolfSSL, while each sub-flow stores the timeval for its \texttt{Heartbeat}, since each sub-flow manages its own \texttt{Hearbeat} exchange.
+Concerning our implementation, the timeval for the \texttt{CIM} is stored in the general structure of wolfSSL, while each subflow stores the timeval for its \texttt{Heartbeat}, since each subflow manages its own \texttt{Heartbeat} exchange.
 
 \subsection{Packets count}
 
-If the previous strategy guarantees us some time bounds on the trigger, the "packet-count" strategy allows us to have a more adaptive transmission in regards of the actual traffic. As the feedback primary purpose is directly related to the amount of traffic on a flow, we decided to use this strategy for the \texttt{Feedback} packets, both for the transmission and retransmission in case of missing acknowledgement.
+If the previous strategy guarantees some time limits on the trigger, the "packet-count" strategy allows us to have a more adaptive transmission regarding the actual traffic. The feedback primary purpose is directly related to the volume of traffic on a subflow and we decided to use this strategy for the \texttt{Feedback} packets, both for the transmission and retransmission in case of missing acknowledgement.
 
-While the design does not require that the exchange of \texttt{Feedback} reports is reliable (see Section \ref{sec:feedbackReport}), we chose to reduce the number of packet to aggregate before sending feedback in case of incremental feedback. That is, when the \texttt{Feedback} or \texttt{FeedbackAck} is lost. The purpose of this reduction is to increase the rate of \texttt{Feedback} message and thus speed up the acknowledgement of feedback and free the memory used to store the cache. The details of this will be explained in the Section \ref{sec:impl-stats}.
+Altough the design does not require a reliable exchange of \texttt{Feedback} reports (see Section \ref{sec:feedbackReport}), we chose to reduce the number of packet to aggregate before sending feedback in case of incremental feedback. That is to say when the \texttt{Feedback} or \texttt{FeedbackAck} is lost. The purpose of this reduction is to increase the rate of \texttt{Feedback} message and thus speed up the acknowledgement of feedback and free the memory used to store the cache. The details of this will be explained in the Section \ref{sec:impl-stats}.
 
 \section{Multipath integration}
 
-The multipath part of the implementation requires some modifications at some strategic points: selection of a flow to send a packet, reception from all the sub-flows simultaneously,\dots We also need to store a few structures in memory to keep sub-flows state and statistics. This section aims to cover all these modifications, that make multipath possible in wolfSSL.
+The multipath part of the implementation requires some modifications at some strategic points: selection of a flow to send a packet, reception from all the subflows simultaneously,\dots We also need to store a few structures in memory to keep subflows state and statistics. This section aims to cover all these modifications, that make multipath possible in wolfSSL.
 
 \subsection{Memory structures}
 
-To be able to use multipath, we needed to store some information in the memory, like the addresses the application wants to advertise, the addresses of the remote host, the created sub-flows and their statistics, the flows waiting for confirmation and the sockets opened to reserve port number but not actively used in a sub-flow. We have implemented helper functions to handle these structures easily, such as inserting new elements, removing element by index or with some criteria and searching for elements. These functions take care of reallocating the memory correctly, to keep the memory footprint as low as possible.
+To be able to use multipath, we needed to store some information in the memory, like the addresses the application wants to advertise, the addresses of the remote host, the created subflows and their statistics, the subflows waiting for confirmation and the sockets opened to reserve port numbers but not actively used in a subflow. We have implemented helper functions to handle these structures easily, such as inserting new elements, removing element either by index or with some criteria and searching for elements. These functions take care of reallocating the memory correctly in order to keep the memory footprint as low as possible.
 
 \addtypes{struct,timeval,byte,uint,word16,MessageState,sockaddr_storage,uint}
 
@@ -255,11 +253,11 @@ typedef struct MPDTLS_ADDRS {
 } MPDTLS_ADDRS;
 \end{lstlisting}
 
-In our implementation, we have added two \texttt{MPDTLS\_ADDRS} structures in the general \texttt{WOLFSSL} \textit{session object} and one in the \texttt{WOLFSSL\_CTX} \textit{context object}.
+In our implementation, we have added two \texttt{MPDTLS\_ADDRS} structures to the general \texttt{WOLFSSL} \textit{session object} and one to the \texttt{WOLFSSL\_CTX} \textit{context object}.
 
-The first structure \texttt{mpdtls\_host} contains the addresses advertised by the host. An application can insert new addresses into this list by two ways. First, it can call the \texttt{wolfSSL\_mpdtls\_new\_addr (WOLFSSL*, const char*)} function, with the session object and an address as a string, under either IPv4, IPv6 or DNS format, as arguments. The other way is \texttt{wolfSSL\_mpdtls\_new\_addr\_CTX (WOLFSSL\_CTX*, const char*)}. This contextual variant adds the address into the context object rather than in the session object. All the sessions created from this context will inherit its host addresses. To ensure that this list of registered addresses is correctly synchronised, a \texttt{CIM} is issued either each time a new address is added or just after the handshake of a session inheriting addresses from its context.
+The first structure \texttt{mpdtls\_host} contains the addresses advertised by the host. An application can insert new addresses into this list by two ways; first, it can call the \texttt{wolfSSL\_mpdtls\_new\_addr (WOLFSSL*, const char*)} function, with the session object and an address as a string, under either IPv4, IPv6 or DNS format, as arguments. In case of DNS, all addresses found during the resolution are added at once. The other way is to call \texttt{wolfSSL\_mpdtls\_new\_addr\_CTX (WOLFSSL\_CTX*, const char*)}. This contextual variant adds the address in the \textit{context object} rather than in the \textit{session object}. All the sessions created from this context will inherit its host addresses. To ensure that this list of registered addresses is correctly synchronised, a \texttt{CIM} is issued either each time a new address is added or just after the handshake of a session inheriting addresses from its context.
 
-The second structure \texttt{mpdtls\_remote} stores the addresses advertised by the other host. It is updated only upon reception of a \texttt{ChangeInterfaceMessage} and is used to know which sub-flows can be created.
+The second structure \texttt{mpdtls\_remote} stores the addresses advertised by the other host. It is updated only after reception of a \texttt{ChangeInterfaceMessage} and is used to know which subflows can be created.
 
 \begin{lstlisting}[caption=Structure containing inactive socket,label=lst:sockpool]
 typedef struct MPDTLS_SOCKS {
@@ -268,7 +266,7 @@ typedef struct MPDTLS_SOCKS {
 } MPDTLS_SOCKS;
 \end{lstlisting}
 
-However, from the Section \ref{sec:advertise} and more specifically the Listing \ref{lst:cimformat}, we can see that each address advertised must also mention the port reachable for the flow. As the flow does not already exist, the port is not already known at the time of advertisement. To determine this port, we let the OS assign one to the application simply by opening a socket. We then retrieve the port number and register it in the \texttt{MPDTLS\_ADDRS} structure. But, if we delete the socket right after, there no guarantee that the port number that we got will not be reassigned, and thus would become unavailable. To avoid that, we store the created socket in a \texttt{MPDTLS\_SOCKS} structure (Listing \ref{lst:sockpool}). When we finally create a flow with the address corresponding to a socket of this pool, we reuse it instead of creating a new socket. In this way, we keep the amount of open sockets low while keeping the advertised port number safe.
+However, from the Section \ref{sec:advertise} and more specifically the Listing \ref{lst:cimformat}, we can see that each address advertised must also mention the port reachable for the flow. As the subflow does not already exist, the port is still unknown when advertising. To determine this port, we let the OS assign a port number to the application simply by opening a socket. We then retrieve the port number and register it in the \texttt{MPDTLS\_ADDRS} structure. But, if we delete the socket just after, the port number could be reassigned, and thus would become unavailable for the library. To avoid this issue, we store the created socket in a \texttt{MPDTLS\_SOCKS} structure (Listing \ref{lst:sockpool}). When we finally create a subflow with the address corresponding to a socket of this pool, we reuse it instead of creating a new socket. In this way, we keep the amount of open sockets low while keeping the advertised port number safe.
 
 \begin{lstlisting}[caption=Structures handling flows, label=lst:flow]
 typedef struct MPDTLS_FLOW_HEARTBEAT {
@@ -301,43 +299,47 @@ typedef struct MPDTLS_FLOWS {
 } MPDTLS_FLOWS;
 \end{lstlisting}
 
-\subsection{Sub-flow creation}
+\subsection{Subflow creation}
 
-Following the exchange of \texttt{WantConnect} and \texttt{WantConnectAck} (explained in Section \ref{sec:setupflow}), a new sub-flow can be opened. From an implementation viewpoint, this means that a new flow must be added in the \texttt{MPTDLS\_FLOWS} structure (depicted in the Listing \ref{lst:flow}) and a new socket must be opened and connected with the other host address and port.
+Following the exchange of \texttt{WantConnect} and \texttt{WantConnectAck} (explained in Section \ref{sec:setupflow}), a new subflow can be opened. From an implementation viewpoint, it means that this new subflow must be added in the \texttt{MPTDLS\_FLOWS} structure (shown on the Listing \ref{lst:flow}) and a new socket must be opened and connected with the other host address and port.
 
-However, as seen in the Section \ref{sec:setupflow}, the host that receives a connection request has to set up its socket and flow structure before it has the confirmation that the flow must be created. As the \texttt{WantConnectAck} can be lost on the return path, it is not impossible the request issuer asks again the opening of the same flow. Therefore, we needed a way to differentiate well-established sub-flows and sub-flows requiring confirmation (realized by a \texttt{Heartbeat} exchange).
+However, as seen in the Section \ref{sec:setupflow}, the host that receives a connection request has to set up its socket and flow structure before having the confirmation that the subflow must be created. As the \texttt{WantConnectAck} can be lost on the return path, it is not impossible the request issuer asks again the opening of the same connection. Therefore, we needed a way to differentiate well-established subflows and subflows requiring confirmation (realized by a \texttt{Heartbeat} exchange).
 
-This differentiation is made through the use of a second \texttt{MPDTLS\_FLOWS} structure in memory, containing the waiting flows. This way, we know if a request is legit or if it is a replay due to a loss occurred during the process, simply by checking the existence of the requested flow into this secondary structure. To avoid an unlimited growth of this structure, we check in the \texttt{CheckTimeouts} it is not in waiting state for too long, otherwise we forget the corresponding request.
+This differentiation is made through the use of a second \texttt{MPDTLS\_FLOWS} structure in memory, containing the waiting flows. This way, we know if a request is legitimate or if it is a replay due to a loss occurred during the process, simply by checking the existence of the requested subflow into this secondary structure. To avoid an unlimited growth of this structure, we check in the \texttt{CheckTimeouts} it is not in waiting state for too long, otherwise we forget the corresponding request.
 
-To detect these waiting flows, we use the existing \texttt{last\_heartbeat} field to store the creation time of the flow. In the current implementation, the timeout for the waiting flows is defined through a preprocessor constant and set to 300 seconds.
+To detect these waiting subflows, we use the existing \texttt{last\_heartbeat} field to store their creation time. In the current implementation, the timeout for the waiting subflows is defined through a preprocessor constant and set to 300 seconds.
 
-Otherwise, if a heartbeat request is received on a waiting flow, this latter is immediately considered as active and transferred in the primary structure.
+Otherwise, if a heartbeat request is received on a waiting subflow, this latter is immediately considered as active and transferred to the primary structure.
 
 \subsection{Multipath I/O}
 
-Once we have multiple flows, we need to listen to all of them. In the original implementation of WolfSSL (explained in Section \ref{sec:packet-reception} and illustrated in Figure \ref{fig:readdiag}), the library directly listened to the flow by calling the \texttt{CBIORecv} macro with the socket descriptor, with CBIORecv generally pointing to \texttt{recvfrom} on a Unix system. To listen to all the registered sockets, we cannot directly go into \texttt{CBIORecv}. Instead, we can use the function \texttt{select(2)} to listen for incoming packets on all the sockets, and once a packet arrives, we can call \texttt{CBIORecv} with the socket returned by \texttt{select}. So, we can see the implementation of the receiving part of Multipath DTLS is quite easy.
+Once we have multiple subflows, we need to listen to all of them. In the original implementation of WolfSSL (explained in Section \ref{sec:packet-reception} and illustrated in Figure \ref{fig:readdiag}), the library directly listened to the flow by calling the \texttt{CBIORecv} macro with the socket descriptor, with CBIORecv generally pointing to \texttt{recvfrom} on a Unix system. To listen to all the registered sockets, we cannot directly go into \texttt{CBIORecv}. Instead, we can use the function \texttt{select(2)} to listen for incoming packets on all the sockets, and once a packet arrives, we can call \texttt{CBIORecv} with the socket returned by \texttt{select}. So, we can see the implementation of the receiving part of Multipath DTLS is quite easy.
 
-The sending part (Figure \ref{fig:writediag}) is even easier, as we just need to replace the socket used to send the current packet through \texttt{CBIOSend}. This replacement is made in \texttt{SendBuffered} to disturb as few as possible the library. As DTLS already used the field \texttt{ssl->buffers.dtlsCtx.fd} to indicate the socket descriptor to give to \texttt{sendto}, which is generally the function called by the \texttt{CBIOSend} macro on a Unix system. To determine the socket descriptor to put in the \texttt{dtlsCtx}, we have two ways: the path manager (explained in the subsection \ref{ssec:pathmanager}) or the preference setting.
+The sending part (Figure \ref{fig:writediag}) is even easier, as we just need to replace the socket used to send the current packet through \texttt{CBIOSend}. This replacement is made in \texttt{SendBuffered} to disturb as few as possible the library. As DTLS already used the field \texttt{ssl->buffers.dtlsCtx.fd} to indicate the socket descriptor to give to \texttt{sendto}\footnote{which is generally the function called by the \texttt{CBIOSend} macro on a Unix system}, we reuse this field. There are two possibilities to determine the socket descriptor to put in the \texttt{dtlsCtx}: the path manager (explained in the subsection \ref{ssec:pathmanager}) or the preference setting.
 
-Sometimes, we need to specify explicitly the flow to use for a message, like for the \texttt{Heartbeat Response}, which must go back on the same flow as the \texttt{HeartbeatRequest}. For this, we added a special option in the session object allowing us to specify a flow of preference. If this option is set, it has priority on the Path manager and the packets will be sent on this socket, without asking to the path manager which flow should be used.
+Sometimes, we need to explicitly specify the flow to use for a message, like for the \texttt{Heartbeat Response}, which must go back on the same flow as the \texttt{HeartbeatRequest}. For this, we added a special option in the session object allowing us to specify a preferred flow. If this option is set, it has priority on the Path manager and the packets will be sent on this socket, without asking to the path manager which flow should be used.
+
+\subsection{Failure detection}
+
+In case of a link failure, we must delete the subflow which has failed to redirect the traffic to other available subflows. This is done in the \texttt{SendTo} and \texttt{ReceiveFrom} functions by treating the errors reported by the socket. If an interface fails because it has been removed from the computer (e.g. Wi-Fi USB stick) then the socket will return an error and we will loose the current packet. But all the following packets will be routed to other subflows. Similar behavior happens if we bring our smartphone out of the Wi-Fi range: an \texttt{address unreachable} error will be reported.
 
 \subsection{Path manager}\label{ssec:pathmanager}
 
-To compute the fractional distribution, the \texttt{apply\_scheduling\_policy()} function is called every time we receive a feedback containing new information about the links. Different scheduler policies may be implemented but the principle is always the same: it is about to give more or less weight to a flow. To do so, each flow possess tokens and the ratio $\frac{tokens}{total\,tokens}$ gives the fraction of the traffic that will go through this flow. We have added a new API call to easily change the scheduling policy even in the middle of the communication.
+To compute the fractional distribution, the \texttt{apply\_scheduling\_policy()} function is called every time we receive a feedback containing new information about the links. Different scheduler policies may be implemented but the principle is always the same: to give more or less weight to a subflow. To do so, each subflow has tokens and the ratio $\frac{tokens}{total\,tokens}$ gives the fraction of the traffic going through this subflow. We have added a new API call to easily change the scheduling policy at any moment the communication. More information about the different scheduling policies are given in the Section \ref{sec:perf-sched}.
 
-In addition, we have implemented 2 schedulers that are independent of the scheduling policy. Their role is to choose for a particular packet which flow will be used given a fractional distribution. The first option we have explored is to build a deterministic scheduler that will iterate sequentially over the different flows. Thanks to the tokens approach, the complexity of this scheduler is of $O(1)$. The second option is to introduce some randomness with a non-deterministic scheduler. Every time we want to send a packet, a new random number is generated between 1 and the total number of tokens. The corresponding flow is chosen to handle the packet. This second approach is probably better because it does not likely produce burst of packets as the first one. Unfortunately to determine the flow which corresponds to the random number generated we need $O(n)$ instructions where $n$ is the number of flows. Although it may be possible to reduce this complexity with advanced data structures such as HashMap, we have not explored these options yet.
+In addition, we have implemented 2 schedulers that are independent of the scheduling policy. Their role is to select a subflow for a particular packet given a fractional distribution. The first option explored is to build a deterministic scheduler that will iterate sequentially over the different subflows. Thanks to the tokens approach, the complexity of this scheduler is of $O(1)$. The second option is to introduce some randomness with a non-deterministic scheduler. Before sending a packet, a new random number is generated between 1 and the total number of tokens. The corresponding subflow is chosen to handle the packet. This second approach is probably better because it is not likely to produce burst of packets as the first one. Unfortunately to determine the subflow which corresponds to the random number generated we need $O(n)$ instructions where $n$ is the number of subflows. Although it may be possible to reduce this complexity with advanced data structures such as HashMap, we don't have explored these options yet.
 
-More information about the different scheduling policies are given in the Section \ref{sec:perf-sched}. We also compare the two schedulers presented before in various environments.
+Since we only provide examples of schedulers and an application may need to have its own scheduler to answer specific needs, we give a way to change it easily. The \texttt{wolfSSL\_CTX\_SetScheduler( WOLFSSL\_CTX*, CallbackSchedule)} function will give a way to an application to specify in the \textit{context object} which scheduler should be called every time we want to send a packet. This function will take the \textit{ssl object} in parameter as well as our \texttt{MPDTLS\_FLOWS} structures to access all data about each subflow and be able to make a choice.
 
 \section{Compute the statistics}\label{sec:impl-stats}
 
-To compute the statistics on different paths, we have followed the concepts we explain in Section \ref{sec:mpdtls-feedback}. Every connection can be seen like two half-connections each of them implying a sender and a receiver. In the following sections, we present what we have implemented and review some concrete examples. 
+To compute the statistics on different paths, we have followed the concepts we explain in Section \ref{sec:mpdtls-feedback}. Every connection can be considered as two half-connections, each of them implying a sender and a receiver. In the following sections, we present what we have implemented and review some concrete examples. 
 
 \subsection{Sender side}
 
 \subsubsection{Structure in memory}
 
-The structure we use to store the sender statistics is presented on Listing \ref{lst:sender-stats}. One of the design choice made was to store the sequence number in a structure similar to the \texttt{ArrayList} of Java\footnote{\url{https://docs.oracle.com/javase/7/docs/api/java/util/ArrayList.html}}. Indeed, we have an array with a certain capacity and we can add as many elements as we want. To avoid doing too many memory allocations, we always double the size if we need more space. In consequence, the variable \texttt{capacity} remembers the real size of the array in memory while the \texttt{nbr\_packets\_sent} indicates the number of elements stored in the array. An array of variable size was needed because we never know in advance how many elements will be stored. Indeed, it will depend if we loose some feedback packets or not.
+The structure we use to store the sender statistics is presented on Listing \ref{lst:sender-stats}. One of the design choice is to store the sequence number in a structure similar to the \texttt{ArrayList} of Java\footnote{\url{https://docs.oracle.com/javase/7/docs/api/java/util/ArrayList.html}}. Indeed, we have an array with a defined capacity and we can add as many elements as we want. To avoid too many memory allocations, we always double the size when we need more space. In consequence, the variable \texttt{capacity} remembers the real size of the array in memory while the \texttt{nbr\_packets\_sent} indicates the number of elements stored in the array. A variable size array is needed because we never know in advance how many elements will be stored. It will depend on the lost rate of feedback packets.
 
 \addtypes{uint, uint64_t}
 \begin{lstlisting}[caption=Sender structure to store statistics, label=lst:sender-stats]
@@ -353,34 +355,34 @@ typedef struct MPDTLS_SENDER_STATS {
 
 \subsubsection{Processing feedback}
 
-The sender has to keep in memory an array of the packets sent on each path. Nevertheless this list cannot grow infinitely as the sender is supposed to receive regularly some feedback from the receiver. The way each feedback will impact the list is depicted on Figure \ref{fig:feedback-imp1}. For the sake of simplicity, we have only considered 3 fields of the feedback packet, namely the feedback sequence number, the minimum and the maximum sequence number received. At the beginning, no feedback at all has been received and all packets have the same status. Then a first feedback packet is received and report an acknowledgement for the packets 1 to 4. These particular packets have a special status , they have been reported a first time but they still can't be removed from the list. Indeed, we never know at this stage if the feedback ack has been received successfully by the other side. This separation is assured by the \texttt{waiting\_ack} variable from Listing \ref{lst:sender-stats} which always remembers the position of the first packet not reported yet (5 in this case). 
+The sender must keep in memory an array of the packets sent on each path. Nevertheless this list cannot grow infinitely as the sender is supposed to receive regularly some feedback from the receiver. The way each feedback will impact the list is depicted on Figure \ref{fig:feedback-imp1}. For the sake of simplicity, we have only considered 3 fields of the feedback packet, namely the feedback sequence number, the minimum and the maximum sequence number received. At the beginning, no feedback at all has been received and all packets have the same status. Then a first feedback packet is received and reports an acknowledgement for the packets 1 to 4. These particular packets obtain a special status, they have been reported a first time but they still can't be removed from the list. Indeed, we never know at this stage if the feedback ack has been received successfully by the other side. This separation is assured by the \texttt{waiting\_ack} variable from Listing \ref{lst:sender-stats} which always remembers the position of the first packet not reported yet (5 in this case). 
 
 \begin{figure}[!ht]
 \centering
-\includegraphics[width=\textwidth]{images/Feedback-implem1.eps}
+\includegraphics[width=0.8\textwidth]{images/Feedback-implem1.eps}
 \caption{How the feedback works in the sender side}
 \label{fig:feedback-imp1}
 \end{figure}
 
 
-When a second feedback arrives, everything below the minimum sequence number reported (packets 1 to 4 in this case) can be removed from the list. The reason we can do that is because the feedback packets are cumulative. It would probably become clearer with the second example on Figure \ref{fig:feedback-imp2}. It is exactly the same scenario as before except that the \texttt{FeedbackAck} is lost. Therefore, on the next feedback, the receiver will report all the statistics from the beginning. In consequence, the sender will have to wait one more feedback to shrink the list.
+When a second feedback arrives, everything below the minimum sequence number reported (packets 1 to 4 in this case) can be removed from the list, because the feedback packets are cumulative. It will probably become clearer with the second example on Figure \ref{fig:feedback-imp2}. It is exactly the same scenario as before except that the \texttt{FeedbackAck} is lost. Therefore, on the next feedback, the receiver will report all the statistics from the beginning. In consequence, the sender will have to wait one more feedback to shrink the list.
 
 \begin{figure}[!ht]
 \centering
-\includegraphics[width=\textwidth]{images/Feedback-implem2.eps}
+\includegraphics[width=0.8\textwidth]{images/Feedback-implem2.eps}
 \caption{How the feedback works in the sender side with losses}
 \label{fig:feedback-imp2}
 \end{figure}
 
-Note that in our example the sequence numbers are sequential. It is not a requirement since in practice packets will be sent on different paths and therefore some gaps may be present between sequence numbers on a particular path. Nevertheless will still need the sequence number to be strictly increasing over time for the max-min mechanism to work well. This is guaranteed by DTLS and even if we reach the maximum sequence number allowed, the handshake must first be repeated according to \cite{rfc5246}.
+Note that in our example the sequence numbers are sequential. It is not a requirement since in practice packets are sent on different paths and therefore some gaps may be present between sequence numbers on a particular path. Nevertheless the sequence number must remain strictly increasing over time for the max-min mechanism to work well. This is guaranteed by DTLS and even if we reach the maximum sequence number allowed, the handshake must be first repeated according to RFC5246\cite{rfc5246}.
 
-The loss rate is computed every time we received a feedback on the range [min,max] carried by this feedback. This will sometimes cause to compute the loss rate on overlapping sets of packets. This is the case with the scenario presented on figure \ref{fig:feedback-imp2}: we first compute the loss rate on the packets 1 to 4 and then a second time on the packets 1 to 7. As stated in the design part, the loss rate is only an estimation of the real loss rate. However in practice, our system estimates quite accurately the real loss rate (see Section \ref{sec:perfs-loss} for more details). In addition, as recommended in Section \ref{sec:design-loss-rate}, we use an exponential average to consider new loss rates. This prevents short term statistics to impact too heavily the global loss rate of the flow.
+The loss rate is computed every time we receive a feedback on the range [min,max] carried by this feedback. It sometimes implies to compute the loss rate on overlapping sets of packets. This is the case with the scenario presented on figure \ref{fig:feedback-imp2}: we first compute the loss rate on the packets 1 to 4 and then a second time on the packets 1 to 7. As stated in the design part, the loss rate is only an estimation of the real loss rate. However in practice, our system estimates quite accurately the real loss rate (see Section \ref{sec:perfs-loss} for more details). In addition, as recommended in Section \ref{sec:design-loss-rate}, we use an exponential average to consider new loss rates. This prevents short term statistics to impact too heavily the global loss rate of the subflow.
 
 \subsection{Receiver Side}
 
 \subsubsection{Structure in Memory}
 
-As for the sender statistics, every flow has to keep some information in memory to monitor the quality of the link. The C structure used is presented on Figure \ref{lst:receiver-stats}. The biggest difference with the sender is the size of the structure which is constant here. Indeed, we don't need to remember every packet received but instead only the minimum and maximum sequence number received so far.
+As for the sender statistics, each subflow has to keep some information in memory to monitor the quality of the link. The C structure used is presented on Figure \ref{lst:receiver-stats}. The biggest difference with the sender is the constant size of the structure. Indeed, we don't need to remember every packet received but only the minimum and maximum sequence number received so far.
 
 \begin{lstlisting}[caption=Receiver structure to store statistics, label=lst:receiver-stats]
 typedef struct MPDTLS_RECEIVER_STATS {
@@ -402,7 +404,7 @@ typedef struct MPDTLS_RECEIVER_STATS {
 
 \subsubsection{Returning feedback}
 
-The way feedback is handled on the receiver side is way more simple than on the sender's. Indeed, we just need to support cumulative feedback. Figure \ref{fig:feedback-imp3} presents the same scenario of Figure \ref{fig:feedback-imp2} but this time on the receiver side. The feedback ack being lost, packets 1 to 4 have not been removed. Indeed, the receiver cannot make the distinction between the loss of the original feedback and the one of the feedback ack.
+The way the feedback is handled on the receiver side is simpler than on the sender's. We just need to support cumulative feedback. Figure \ref{fig:feedback-imp3} presents the same scenario as Figure \ref{fig:feedback-imp2} but on the receiver side. The feedback ack being lost, packets 1 to 4 are not removed. Indeed, the receiver cannot make the distinction between the loss of the original feedback and the feedback ack one.
 
 \begin{figure}[!ht]
 \centering
@@ -411,14 +413,14 @@ The way feedback is handled on the receiver side is way more simple than on the 
 \label{fig:feedback-imp3}
 \end{figure}
 
-What we have called the "cache" will aggregate all previous feedback. When the threshold is reached and the receiver has to send feedback, he will first merge the current statistics with the cache to generate the cumulative feedback. The latter is sent to the sender (on the same flow) and the sequence number is remembered in the \texttt{last\_feedback} variable of Listing \ref{lst:receiver-stats}. Then the cache is replaced by this new generated feedback.
+What we have called the "cache" will aggregate all previous feedback. When the threshold is reached and the receiver has to send feedback, it first merges the current statistics with the cache to generate the cumulative feedback. The latter is sent to the sender (on the same flow) and the sequence number is stored in the \texttt{last\_feedback} variable of Listing \ref{lst:receiver-stats}. Then the cache is replaced by this new generated feedback.
 
 
 \subsubsection{Processing feedback ack}
 
-When a feedback ack is received, the receiver must check if the sequence number corresponds to the last feedback sent. IF they match then the cache is emptied and we are in a situation similar to the one depicted on Figure \ref{fig:feedback-imp1}. The feedback ack carry the sequence number 8 which matches the latest feedback sent thus the cache containing packets 1 to 4 is emptied. Therefore the next feedback will report statistics on packets 5 to 7 only.
+When a feedback ack is received, the receiver must check if the sequence number corresponds to the last feedback sent. If they match then the cache is emptied and we are in a situation similar to the one depicted on Figure \ref{fig:feedback-imp1}. The feedback ack carries the sequence number 8 which matches the latest feedback sent thus the cache containing packets 1 to 4 is emptied. Therefore the next feedback will report statistics on packets 5 to 7 only.
 
-If the feedback ack does not contain the sequence number of the latest feedback sent we simply discard it. This kind of situations may be encountered if we have interleaving. 
+If the feedback ack does not contain the sequence number of the latest feedback sent we simply discard it. This kind of situations may be encountered if we have packet interleaving. 
 
 
 \subsubsection{Computing backward delay}
@@ -428,5 +430,7 @@ The backward delay is computed thanks to regular heartbeat messages going from t
 To get the current time of a system, we use the \texttt{gettimeofday()} function with a \texttt{timeval} structure. It gives a microsecond precision but we actually decided to consider only the milliseconds. If there are two links we cannot differentiate at the millisecond level, we can just consider them as of equal speed (i.e. the gain will not be significant enough to treat them differently). Of course this could be adapted easily if we have a real interest for such precision and if network components become much faster.
 
 When the receiver treats a \texttt{HEARTBEAT\_TIMESTAMP}, it computes the absolute value of the difference between his current time and the one contained in the message. This will give the backward delay with the clock desynchronization term. The receiver will add these delays and keep in memory the exponential average (variable \texttt{backward\_delay} of Listing \ref{lst:receiver-stats}). Every time it sends a feedback, it includes its estimation of the backward delay which gives the sender its forward delay.
+
+
 
 

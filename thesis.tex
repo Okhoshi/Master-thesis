@@ -8,16 +8,28 @@
 \usepackage{times}
 \usepackage{amsmath}
 \usepackage{natbib}
+\usepackage{titlesec}
 \usepackage{array}
 \usepackage{listings}
 \usepackage{pgf-umlsd}
 \usepackage{parskip}
 \usepackage{gensymb}
 \usepackage{indentfirst}
+\usepackage{tabularx}
 \usepackage[htt]{hyphenat}
+\usepackage[toc,nopostdot,nonumberlist]{glossaries}
 
 \setlength{\parskip}{10pt} %add space between paragraphs
 \setlength{\parindent}{0cm} % can remove all indentations
+
+\def\@listi{%
+  % default settings for base LaTeX classes at 10pt:
+  \parsep 4pt plus 2pt minus 1pt
+  \topsep 8pt plus 2pt minus 4pt
+  \itemsep 4pt plus 2pt minus 1pt
+  % your settings:
+  \parskip 2pt plus 1pt minus 1pt
+}
 
 %%% Fix the issue with \mess redefinition when importing msc
 \let\msg\mess
@@ -25,9 +37,14 @@
 
 \newcommand\draft{0}
 
-\if1\draft
-    \overfullrule=2cm
-\fi
+\definecolor{gitgreen}{HTML}{55A532}
+\definecolor{gitred}{HTML}{BD2C00}
+\definecolor{gitgray}{HTML}{D0D0D0}
+
+\newcommand\crule[3][black]{\textcolor{#1}{\rule{#2}{#3}}}
+\newcommand\grule{\crule[gitgreen]{.25cm}{.25cm}\crule[white]{.05cm}{.25cm}}
+\newcommand\rrule{\crule[gitred]{.25cm}{.25cm}\crule[white]{.05cm}{.25cm}}
+\newcommand\garule{\crule[gitgray]{.25cm}{.25cm}\crule[white]{.05cm}{.25cm}}
 
 \lstset{
   language = C,
@@ -90,8 +107,13 @@ bindingoffset=10mm, top=25mm,bottom=25mm}
 \OnehalfSpacing
 %\linespread{1.3}
 
+\definecolor{gray75}{gray}{0.75}
+\newcommand{\hsp}{\hspace{20pt}}
+\titleformat{\chapter}[hang]{\Huge\bfseries}{\thechapter\hsp\textcolor{Blue}{|}\hsp}{0pt}{\Huge\bfseries}
+\titlespacing*{\chapter}{0pt}{0pt}{40pt}
+
 %%% CHAPTER'S STYLE
-\chapterstyle{bianchi}
+%\chapterstyle{bianchi}
 %\chapterstyle{ger}
 %\chapterstyle{madsen}
 %\chapterstyle{ell}
@@ -102,28 +124,39 @@ bindingoffset=10mm, top=25mm,bottom=25mm}
 
 
 %%% STYLE OF PAGES NUMBERING
-%\pagestyle{companion}\nouppercaseheads 
+\pagestyle{companion}\nouppercaseheads 
 %\pagestyle{headings}
 %\pagestyle{Ruled}
-\pagestyle{plain}\nouppercaseheads
-\makepagestyle{plain}
-\if0\draft
-\makeevenfoot{plain}{\thepage}{Multipath DTLS: Design and Implementation}{}
-\makeoddfoot{plain}{}{Q. Devos \& L. Fortemps de Loneux}{\thepage}
-\makeevenhead{plain}{\leftmark}{}{}
-\makeoddhead{plain}{}{}{\rightmark}
-\else
-\makeevenfoot{plain}{\thepage}{}{}
-\makeoddfoot{plain}{}{}{\thepage}
-\makeevenhead{plain}{}{}{}
-\makeoddhead{plain}{}{}{}
-\fi
+%\pagestyle{plain}\nouppercaseheads
+%\makepagestyle{companion}
+
+\makeevenfoot{companion}{\thepage}{\textsc{Multipath DTLS: Design and Implementation}}{}
+\makeoddfoot{companion}{}{Q. \textsc{Devos} \& L. \textsc{Fortemps de Loneux}}{\thepage}
+\makeevenhead{companion}{\leftmark}{}{}
+\makeoddhead{companion}{}{}{\rightmark}
+
+\copypagestyle{minechapter}{plain}
+\makeevenhead{minechapter}{}{}{}
+\makeoddhead{minechapter}{}{}{}
+\makeevenfoot{minechapter}{\thepage}{\textsc{Multipath DTLS: Design and Implementation}}{}
+\makeoddfoot{minechapter}{}{Q. \textsc{Devos} \& L. \textsc{Fortemps de Loneux}}{\thepage}
+\aliaspagestyle{chapter}{minechapter}
 
 \maxsecnumdepth{subsection} % chapters, sections, and subsections are numbered
 \maxtocdepth{subsection} % chapters, sections, and subsections are in the Table of Contents
 
+%%%% COMMANDS %%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% CHANGE HERE %%%%
+\renewcommand\title{Multipath DTLS:\\\vspace{0.5cm} Design and Implementation}
+\newcommand\options{Networking and Security}
+\newcommand\supervisor{Pr. Olivier \textsc{Bonaventure}}
+\newcommand\supervisortwo{Pr. Olivier \textsc{Pereira}}
+\newcommand\reader{Florentin \textsc{Rochet}}
+\newcommand\years{2014-2015}
+%%%% BEGIN %%%%
 
 %%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%
+\makeglossaries
 
 \begin{document}
 %%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%
@@ -133,67 +166,89 @@ bindingoffset=10mm, top=25mm,bottom=25mm}
 %
 %%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%
 \if0\draft
+
+
+%%%% COVER %%%%
 \thispagestyle{empty}
 
-{%%%
-\sffamily
-\centering
-\Large
+\calccentering{\unitlength}
+\begin{adjustwidth*}{\unitlength}{-\unitlength}
+\noindent\begin{minipage}{.25\textwidth}
+\begin{center}
+\noindent\includegraphics[height=3cm]{images/ucl.eps}
+\end{center}
+\end{minipage}
+\begin{minipage}{.49\textwidth}
+\begin{center}
+\begin{vplace}
+UNIVERSITE CATHOLIQUE DE LOUVAIN
+\\~\\~
+ECOLE POLYTECHNIQUE DE LOUVAIN
+\end{vplace}
+\end{center}
+\end{minipage}
+\begin{minipage}{.25\textwidth}
+\begin{center}
+\begin{vplace}
+\hfill\includegraphics[height=1.5cm]{images/epl.eps}
+\end{vplace}
+\end{center}
+\end{minipage}
+\end{adjustwidth*}
 
-~\vspace{\fill}
 
-EPL-2014 384\\
-{\huge 
-Multipath DTLS: Design and Implementation
-}
+\vspace{4.5cm}
+\begin{center}
+\bfseries{\scshape{\Huge{\title}}}
+\end{center}
+\vspace{4.5cm}
+\begin{minipage}{.5\textwidth}
+\begin{tabular}{ll}
+Supervisors: & \supervisor
+\\ & \supervisortwo 
+\\ Reader:  & \reader 
+\end{tabular} 
+\\~\\~\\~\\~
+\end{minipage}
+\begin{minipage}{.5\textwidth}
+Thesis submitted for the Master's degree
+\\ in computer science and engineering
+\\ option: \options
+\\~\\~
+\begin{tabular}{ll}
+by & Quentin \textsc{Devos} \\
+& Loïc \textsc{Fortemps de Loneux}
+\end{tabular}
+\end{minipage}
+\vfill
+\begin{center}
+Louvain-la-Neuve
+\\ Academic year \years - June
+\end{center}
+%%%% END COVER %%%%
 
-\vspace{2.5cm}
-
-{\LARGE
-Quentin Devos \\
-Loïc Fortemps de Loneux
-}
-
-\vspace{3.5cm}
-
-A thesis submitted in partial fulfillment for the\\
-Master in Computer Science Engineering\\[1em]
-in the\\[1em]
-Louvain School of Engineering\\
-Université Catholique de Louvain
-
-\vspace{3.5cm}
-
-Supervisors: \\
-Prof. Olivier Bonaventure\\
-Prof. Olivier Pereira
-
-\vspace{\fill}
-
-June 2015
-
-%%%
-}%%%
-
+\include{acknowledgement}
+%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%
+%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%
+\pagenumbering{roman}
+\include{abstract} % Corrected
 \cleardoublepage
-%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%
-%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%
-
 \tableofcontents*
-\clearpage
+\cleardoublepage
 
 \listoffigures*
-\clearpage
+\cleardoublepage
 
 \lstlistoflistings*
-\clearpage
+\cleardoublepage
 
 %%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%
 %%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%
 
-\include{abstract} % Corrected
+
+\include{glossary}
+\pagenumbering{arabic}
 \include{intro} % Corrected
-
 \markboth{}{}
 \part{State of the Art}
 \include{dtls} % Corrected
@@ -202,19 +257,22 @@ June 2015
 \markboth{}{}
 \part{Multipath DTLS}
 \include{design} % Corrected
-\fi
 \include{implem} % rereading
-\if0\draft
 \include{performances} % rereading
-\fi
 \include{conclusion} % rereading
-\include{acknowledgement}
+
+\fi
+\if0\draft
+
 \bibliographystyle{unsrt}
 \bibliography{articles,rfcs}
 
-\if0\draft
+\glsaddall
+\printglossaries
+
 \clearpage
 \markboth{}{}
+\pagenumbering{Roman}
 \addcontentsline{toc}{part}{Appendices}
 \part*{Appendices}
 
@@ -224,6 +282,8 @@ June 2015
 
 
 \fi
+\include{appendices/graph_process}
+\include{appendices/contrib}
 
 \end{document}
 

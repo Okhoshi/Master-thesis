@@ -1,0 +1,175 @@
+\chapter{Instructions to generate graphs}
+\label{app:graph}
+
+This appendix aims to detail the steps followed to get the figures presented in the Chapter \ref{chap:perfs}.
+
+\section{Installing tools}
+
+\subsection{Manual install}
+
+If you do not want to use Docker, the manual installation steps are presented in the following sections. Otherwise, you should go directly to Section \ref{sec:dock-install} to proceed with the Docker image.
+
+\subsubsection{Installing the library}
+
+The first step is of course to install our modified version of wolfSSL \cite{wolfssl-mpdtls}. Be careful to look at the ./configure -h option which describes all the possible features you may want to enable. For mpdtls to work, you should at least use the flag \texttt{--enable-mpdtls}. Other options may be needed depending on which cipher suite you will use for the handshake. Since wolfSSL targets embedded devices, most of the non-essential features are turned off by default. This is the case for the elliptic curve cryptography and the Diffie-Hellman key exchange.
+
+Most of the time during the writing of this thesis, wolfSSL has been configured with the following options:
+
+\begin{itemize}
+\item \texttt{--enable-mpdtls}
+\item \texttt{--enable-debug}
+\item \texttt{--enable-dh}
+\item \texttt{--enable-ecc}
+\item \texttt{--disable-oldtls}
+\end{itemize}
+
+\subsubsection{Installing Mininet}
+
+Mininet\cite{mininet} is a useful tool to emulate a specific network topology on a simple computer. Depending on your Linux distribution, you will need to add other packages to make it work. Our experiments are taking place inside a Mininet environment but with the help of Minitopo\cite{minitopo}. This is a Python framework to easily configure the topology and run experiments based on little configuration files.
+
+Instructions to install Mininet can be found on its website \cite{mininet}.
+
+\subsubsection{Installing D-ITG}
+
+D-ITG \cite{ditg} is the Internet traffic generator we use to simulate traffic on top of our MPDTLS tunnel. On most distributions, it can be installed via apt-get.
+
+\begin{lstlisting}
+sudo apt-get install d-itg
+\end{lstlisting}
+
+\subsubsection{Installing Minitopo}
+
+At the time of writing, the Minitopo repository\cite{minitopo} is not yet publicly available, but it should be the case soon. Once the repository is accessible, simply download it and put the content of the \texttt{src} folder into the experimentation directory. Another possibility is to put that folder at any place on the computer and add it to the \texttt{\$PYTHONPATH} environment variable.
+
+The only requirement is that the \texttt{mpPerf.py} must be in the experimentation folder.
+
+\subsubsection{Setting up the VPN application}
+
+Our MPDTLS VPN application \cite{mpdtls-vpn} must simply be downloaded and compiled with \texttt{make}. We have modified Minitopo to run the \texttt{Client} and \texttt{Server} executables on different Mininet entities. These executables must be either compiled or copied after compilation inside the experimentation folder.
+
+\subsection{The easy way}
+\label{sec:dock-install}
+
+We have built a Docker \cite{docker} image providing the whole test environment. Once Docker is installed (installation guides are provided for each supported operating systems), the image of our environment can be launched with:
+
+\begin{lstlisting}
+    docker run --privileged multipathdtls/mpdtls-testbed:latest
+\end{lstlisting}
+
+If the image does not exist locally, Docker will take care of downloading it from Docker Hub. As mininet performs some modifications in the interfaces configuration, the Docker container needs absolutely to be ran with the \texttt{--privileged} flag. When the container is ran without any additional parameter, minitopo is launched with the default scripts we provide in the image.
+
+\section{Experiments}
+
+Now that the testing environment is set up, we can start running some experiments within the lab. The base topology of the lab is fixed and was presented in the Section \ref{sec:perftopo}. However, the number of paths between Client and Router can be configured, as well as their specifications.
+
+\subsection{Define the configuration}
+
+The configuration of the experiment is based on at least two configuration files: \texttt{conf} and \texttt{xp}.
+
+\subsubsection{\texttt{conf}}
+
+The \texttt{conf} file controls the topology of the lab, as the number of paths between the Client and the Router for instance. A typical \texttt{conf} file is presented in the Listing \ref{lst:typconf}. A line starting with \texttt{\#} is a comment and not considered to build the topology.
+
+\begin{lstlisting}[label=lst:typconf,caption=Typical configuration file]
+topoType:MultiIf
+leftSubnet:11.0.
+rightSubnet:11.2.
+# path_x:delay,queueSize(may be calc),bw(Mb),loss
+path_0:30,1000,5,0
+path_1:40,1000,5,0
+path_2:10,1000,5,0
+path_3:0,1000,10,0
+\end{lstlisting}
+
+The first line defines the type of Topology that will be used. \textsc{MultiIf} is the only type that interests us.
+
+\texttt{leftSubnet} and \texttt{rightSubnet} defines the IP prefixes that will be used between the Client and the Router and between the Router and the Server respectively.
+
+The last lines, beginning with \texttt{path\_}, defines the paths that must be created between the Client and the Router. The first number is the delay of that path, expressed in milliseconds. The second is the queue size of the interface. As we do not vary this parameter, we let it to its maximal value, 1000. The third is the bandwidth of the link, in Mbps. The last one is the loss rate, in percent.
+
+For instance, the \texttt{conf} presented in the Listing \ref{lst:typconf} would produce the same topology as presented in the Figure \ref{fig:topo-phys}.
+
+\subsubsection{\texttt{xp}}
+
+The \texttt{xp} file tells Minitopo which experiment to run and how to run it. Several experiments are implemented in Minitopo, but we will focus on the \texttt{itg} one, because it involves D-ITG. The other types are explained in the Minitopo documentation\cite{minitopo}.
+
+\begin{lstlisting}[label=lst:typxp,caption=Typical experience file]
+xpType:itg
+vpnSubnet:20.0.
+scheduler:2 100
+script:script.itg
+\end{lstlisting}
+
+As said before, we focus on the ITG experiment, and this is materialized by the first line in Listing \ref{lst:typxp}. The second line, \texttt{vpnSubnet}, defines the subnet used by our VPN application for the TUN interfaces. It must be different than the subnet used for minitopo in the \texttt{conf} file.
+
+The \texttt{scheduler} option defines which scheduler to use during the experiment. The value is directly transmitted to the VPN client and so must follow the format \texttt{N\degree Scheduler[space]Granularity}. The available schedulers are :
+\begin{enumerate}
+\item RoundRobin
+\item OptimizeDelay
+\item OptimizeLoss
+\end{enumerate}
+
+The last option is mandatory when running an ITG experiment. It defines the script to give to ITGSend (which is ran in Multiflow mode). The structure of this file is explained in the next section.
+
+The \texttt{xp} is mandatory but might be empty. In this case, the Mininet cli will appear instead of launching an experience.
+
+\subsubsection{ITG script}
+
+This configuration file, called \texttt{script.itg} by default, defines the flow that must be started by D-ITG. Each line is a flow to start, and can contain every option of ITGSend. These options are explained in the documentation of D-ITG\cite{ditg}.
+
+\begin{lstlisting}[caption=Default content of \texttt{script.itg}]
+-a 20.0.0.1 -rp 8900 -T UDP -t 30000 -c 781.25 -C 300
+\end{lstlisting}
+
+\subsection{Run the lab}
+
+The lab is simply ran by either 
+\begin{lstlisting}
+sudo ./mpPerf.py -t conf -x xp
+\end{lstlisting}
+if all the lab components were installed manually, or
+\begin{lstlisting}
+docker run --privileged -ti multipathdtls/mpdtls-testbed:latest
+\end{lstlisting}
+if the docker way was preferred.
+
+The results of the experiment are available directly in the directory were \texttt{mpPerf.py} was launched. However, if docker was used, the results are stored in a Docker Volume. This volume can be synchronized with a selected folder with the option \texttt{-v \textit{/path/to/folder}:/experience/data} added before \texttt{multipathdtls/mpdtls-testbed}. \texttt{/path/to/folder} must be the absolute path towards the folder.
+
+Also, the configuration files may be modified by using the following options:
+
+\begin{lstlisting}
+-v /path/to/conf:/experience/conf
+-v /path/to/xp:/experience/xp
+-v /path/to/script.itg:/experience/script.itg
+\end{lstlisting}
+
+\subsubsection{Complete experimentation}
+
+To help us in the generation of the Figures \ref{fig:dynbw} and \ref{fig:dynloss}, we wrote two scripts that run 11 times each configuration, with 48 possible configurations (TCP or UDP, Scheduler \texttt{OptimizeLoss} or \texttt{OptimizeDelay}, 4 links characteristics variations and 3 possible total generated bandwidths). These scripts are available on our Gist \cite{script-gist}.
+
+These scripts are already embedded in the Docker image, and can be run by simply adding either \texttt{bandwidth} or \texttt{losses} at the end of the \texttt{docker run} command.
+
+\subsection{Generate graphs}
+
+Once the experiments are done, multiples files are created:
+
+\begin{itemize}
+\item Log files (client, server, lab, command). These files contain the output of the various components of the lab. The most interesting one is \texttt{lab.log}, generated only if the experiments were launched with our scripts. Otherwise, its content is simply the output of the Minitopo execution.
+\item Err files (client and server). These files contain the debug output of the client and server of our VPN application.
+\item Pcap files. These files are the most important as they are the foundations to draw the graphs. They need a working installation of tcpdump to be generated.
+\end{itemize}
+
+In the Gist \cite{script-gist}, there are three python scripts that plot graphs using Matplotlib. In order to use these scripts, some requirements must be followed.
+
+These python packages must be installed:
+\begin{itemize}
+\item matplotlib
+\item numpy
+\item scipy
+\end{itemize}
+
+Tshark is also necessary to generate the csv files from the pcap files. Tshark should be installed with Wireshark.
+
+In general, the python scripts do not need to be called directly. For instance, the Figure \ref{fig:dynbw} can be plotted right after the run of \texttt{bandwidth\_graph.sh} simply by rerunning the script but with the \texttt{draw} argument.
+
+In the case of isolated experiments, some graphs can be plotted with the \texttt{plot.sh} script, also available in the Gist. This script needs that the files generated during the experiments are put in a \texttt{data} folder.
